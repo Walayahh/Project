@@ -25,11 +25,11 @@ jobs:
           SHEETS_ID=${{ secrets.SHEETS_ID }}
           EOF
 
-    #  - name: npm install
-    #    run: npm ci
+      - name: npm install
+        run: npm ci
 
-      - name: Build (if you have a build step)
-        run: npm run build   # or remove if you don't have one
+     # - name: Build (if you have a build step)
+    #    run: npm run build   # or remove if you don't have one
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
