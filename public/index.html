@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StudyBuddy</title>
+
+  <!-- Original Google API loader -->
+  <script src="https://apis.google.com/js/api.js" defer></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- Three.js & Vanta.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.24/vanta.dots.min.js" defer></script>
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js" defer></script>
+
+  <style>
+    :root {
+      --bg-1:#121212; --bg-2:#1e1e1e; --bg-3:#2d2d2d;
+      --txt-1:#fafafa; --txt-2:#b0b0b0;
+      --ac-1:#8c67ff; --ac-2:#4f46e5; --ac-3:#ff6f91; --ac-warn:#f2c94c;
+      --rad-s:6px; --rad-m:12px; --rad-l:20px;
+      --shadow-s:0 4px 20px rgba(0,0,0,.15);
+      --shadow-l:0 8px 30px rgba(0,0,0,.35);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif;}
+    body{background:var(--bg-1);color:var(--txt-1);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;}
+    a{color:var(--ac-1);text-decoration:none;transition:all .2s ease;}a:hover{text-decoration:underline;}
+    #background{position:fixed;inset:0;z-index:-1;}
+    header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:rgba(30,30,30,.85);backdrop-filter:blur(10px);box-shadow:var(--shadow-s);z-index:10;}
+    .logo-container{display:flex;align-items:center;gap:.6rem;}
+    .logo-icon{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--ac-1),var(--ac-2));display:grid;place-content:center;color:#fff;font-weight:700;}
+    .logo{font-size:1.5rem;font-weight:700;background:linear-gradient(90deg,var(--ac-1),var(--ac-3));-webkit-background-clip:text;color:transparent;}
+    nav{display:flex;gap:.3rem;flex-wrap:wrap;}
+    nav button{background:none;border:none;color:var(--txt-2);padding:.55rem .95rem;border-radius:var(--rad-s);cursor:pointer;transition:all .2s ease;position:relative;}
+    nav button:hover, nav button.active{background:rgba(140,103,255,.12);color:var(--txt-1);}
+    nav button.active::after{content:'';position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:22px;height:3px;background:var(--ac-1);border-radius:5px;}
+    main{flex:1;max-width:1400px;margin:0 auto;padding:2rem;}
+    section{display:none;animation:fade .35s ease-in-out;}section.active{display:block;}
+    @keyframes fade{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+    h2.section-title{font-size:1.75rem;margin-bottom:1.4rem;}
+    .card{background:var(--bg-2);padding:1.25rem;border-radius:var(--rad-m);box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.05);transition:all .3s ease;position:relative;}
+    .card:hover{transform:translateY(-4px);box-shadow:var(--shadow-l);}
+    .btn{display:inline-flex;align-items:center;gap:.45rem;border:none;cursor:pointer;padding:.7rem 1.4rem;font-weight:500;border-radius:var(--rad-s);box-shadow:0 2px 6px rgba(0,0,0,.2);transition:all .2s ease;}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,.3);}
+    .btn-primary{background:var(--ac-1);color:#fff;} .btn-secondary{background:rgba(255,255,255,.1);color:var(--txt-1);} .btn-small{padding:.3rem .6rem;font-size:.8rem;}
+    input,textarea,select{background:var(--bg-3);border:1px solid rgba(255,255,255,.1);color:var(--txt-1);padding:.75rem;border-radius:var(--rad-s);width:100%;margin-bottom:1rem;transition:border-color .2s ease;}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac-1);}
+    /* Quotes */
+    #quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem;}
+    #quotes .card{font-style:italic;text-align:center;color:var(--txt-2);}
+    /* Pomodoro */
+    #timerDisplay{font-size:2.5rem;text-align:center;margin:1rem 0;}
+    #timerControls{display:flex;justify-content:center;gap:1rem;}
+    /* Tasks */
+    #tasksBoard{display:flex;gap:1rem;margin-top:1rem;}
+    .column{background:var(--bg-2);flex:1;min-width:240px;padding:1rem;border-radius:var(--rad-m);position:relative;}
+    .column h3{margin-bottom:.8rem;color:var(--txt-2);}
+    .task{background:var(--bg-3);padding:.6rem 1rem;border-radius:var(--rad-s);margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;}
+    .task-buttons button{margin-left:.5rem;}
+    /* Map */
+    #map{width:100%;height:350px;border-radius:var(--rad-m);margin-bottom:1rem;}
+    /* Reviews */
+    .delete-review{position:absolute;top:4px;right:8px;cursor:pointer;color:var(--ac-warn);font-weight:bold;}
+    .delete-review:hover{color:var(--ac-3);}
+    /* Games */
+    #gameSelect{margin-bottom:1rem;}
+    /* Make iframe much bigger */
+    #gameFrame{width:100%;height:80vh;border:none;border-radius:var(--rad-m);margin-top:1rem;box-shadow:var(--shadow-s);}
+    /* Planner */
+    #planList .card{margin-bottom:1rem;padding-right:2.5rem;}
+    #plannerAdvice{margin-top:1rem;background:var(--bg-3);padding:1rem;border-radius:var(--rad-s);max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;}
+    .delete-plan{position:absolute;top:10px;right:10px;cursor:pointer;color:var(--ac-warn);font-weight:bold;font-size:1.2rem;}
+    .delete-plan:hover{color:var(--ac-3);}
+    /* Chat */
+    #chatToggle{position:fixed;bottom:1rem;right:1rem;width:56px;height:56px;border-radius:50%;background:var(--ac-1);color:#fff;font-size:1.5rem;border:none;cursor:pointer;box-shadow:var(--shadow-l);z-index:20;transition:transform 0.3s ease,box-shadow 0.3s ease;}
+    #chatToggle:hover{transform:scale(1.1);box-shadow:0 10px 40px rgba(140,103,255,.4);}
+    #chatWidget{position:fixed;bottom:1.5rem;right:1.5rem;width:340px;height:400px;background:var(--bg-2);border-radius:var(--rad-l);box-shadow:var(--shadow-l);display:flex;flex-direction:column;overflow:hidden;z-index:20;opacity:0;transform:translateY(20px) scale(0.8);pointer-events:none;transition:opacity .3s ease,transform .3s ease;}
+    #chatWidget.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all;}
+    #chatHeader{background:linear-gradient(135deg,var(--ac-1),var(--ac-2));color:#fff;padding:1rem;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:var(--rad-l);border-top-right-radius:var(--rad-l);}
+    #chatClose{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;transition:transform .2s ease;}
+    #chatClose:hover{transform:rotate(90deg);}
+    #chatBody{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.7rem;scroll-behavior:smooth;background:rgba(18,18,18,.3);}
+    .row{display:flex;}
+    .row.me{justify-content:flex-end;}
+    .row p{padding:.75rem 1rem;border-radius:18px;max-width:80%;font-size:.88rem;line-height:1.5;}
+    .me p{background:linear-gradient(135deg,var(--ac-1),var(--ac-2));color:#fff;border-bottom-right-radius:6px;}
+    .bot p{background:var(--bg-3);color:var(--txt-1);border-bottom-left-radius:6px;}
+    #chatInput{display:flex;border-top:1px solid rgba(255,255,255,.06);}
+    #chatInput input{flex:1;border:none;background:var(--bg-3);color:var(--txt-1);padding:.75rem 1rem;border-radius:var(--rad-s);margin:.5rem;outline:none;}
+    #chatInput button{width:42px;height:42px;margin:.5rem;border-radius:50%;background:var(--ac-1);border:none;color:#fff;transition:all .2s ease;cursor:pointer;}
+    #chatInput button:hover{transform:scale(1.1);background:var(--ac-2);}
+    /* Celebration */
+    #celebrationPopup{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--ac-1),var(--ac-2));color:#fff;padding:2rem;border-radius:var(--rad-l);text-align:center;z-index:100;box-shadow:var(--shadow-l);animation:popIn .5s cubic-bezier(.175,.885,.32,1.275) forwards;}
+    #celebrationPopup .emoji{font-size:4rem;margin-bottom:1rem;display:block;}
+    #celebrationPopup h2{font-size:2rem;margin-bottom:1rem;}
+    #celebrationPopup button{margin-top:1rem;background:rgba(255,255,255,.2);border:none;color:#fff;padding:.5rem 1.5rem;border-radius:var(--rad-s);cursor:pointer;transition:all .2s ease;}
+    #celebrationPopup button:hover{background:rgba(255,255,255,.3);}
+    @keyframes popIn{0%{transform:translate(-50%,-50%) scale(.8);opacity:0;}100%{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+  </style>
+</head>
+<body>
+  <div id="background"></div>
+  <header>
+    <div class="logo-container"><div class="logo-icon">S</div><span class="logo">StudyBuddy</span></div>
+    <nav>
+      <button class="active" data-target="dashboard">Dashboard</button>
+      <button data-target="cafes">Cafés</button>
+      <button data-target="games">Play</button>
+      <button data-target="sessions">Sessions</button>
+      <button data-target="planner">Planner</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Dashboard -->
+    <section id="dashboard" class="active">
+      <h2 class="section-title">Dashboard</h2>
+      <div id="quotes"></div>
+      <button id="refreshQuotes" class="btn btn-small btn-primary">Refresh Quotes</button>
+
+      <div class="card">
+        <h3>Pomodoro Timer</h3>
+        <div id="timerDisplay">25:00</div>
+        <div id="timerControls">
+          <button id="startTimer" class="btn btn-primary">Start</button>
+          <button id="pauseTimer" class="btn btn-secondary">Pause</button>
+          <button id="resetTimer" class="btn btn-secondary">Reset</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Tasks</h3>
+        <form id="newTaskForm">
+          <input id="newTaskInput" type="text" placeholder="New task… (Enter or click Add)" required/>
+          <button type="submit" class="btn btn-primary btn-small">Add</button>
+        </form>
+        <div id="tasksBoard">
+          <div class="column" data-status="todo"><h3>To Do</h3></div>
+          <div class="column" data-status="inprogress"><h3>In Progress</h3></div>
+          <div class="column" data-status="completed"><h3>Completed</h3></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cafés -->
+    <section id="cafes">
+      <h2 class="section-title">Nearby Cafés</h2>
+      <div id="map"></div>
+      <div class="card">
+        <h3>Add Café Review</h3>
+        <form id="reviewForm">
+          <input id="reviewName" type="text" placeholder="Cafe name…" required/>
+          <select id="reviewRating" required><option value="">Rating…</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+          <textarea id="reviewText" rows="3" placeholder="Your review…" required></textarea>
+          <button class="btn btn-primary" type="submit">Save Review</button>
+        </form>
+      </div>
+      <h3 style="margin:1.5rem 0 1rem;">Saved Reviews</h3>
+      <div id="cafeReviews" class="grid three-col"></div>
+    </section>
+
+    <!-- Games -->
+    <section id="games">
+      <h2 class="section-title">Take a Break</h2>
+      <select id="gameSelect"></select>
+      <iframe id="gameFrame"></iframe>
+    </section>
+
+    <!-- Sessions -->
+    <section id="sessions">
+      <h2 class="section-title">Study Sessions</h2>
+      <div class="card">
+        <h3>New Session</h3>
+        <form id="sessionForm" class="grid two-col">
+          <div><label>Topic</label><input id="sessionTopic" type="text" required/></div>
+          <div><label>Date</label><input id="sessionDate" type="date" required/></div>
+          <div><label>Duration</label><input id="sessionDuration" type="number" required/></div>
+          <div style="grid-column:1/-1;"><button class="btn btn-primary" type="submit">Add</button></div>
+        </form>
+      </div>
+      <ul id="sessionList"></ul>
+    </section>
+
+    <!-- Planner -->
+    <section id="planner">
+      <h2 class="section-title">Study Planner</h2>
+      <div class="card">
+        <h3>Add Planner Task</h3>
+        <form id="plannerForm">
+          <input id="planTitle" type="text" placeholder="Title…" required style="width:48%;display:inline-block;margin-right:2%;"/>
+          <select id="planCat" style="width:48%;display:inline-block;" required>
+            <option value="">Category…</option><option>Homework</option><option>Reading</option><option>Project</option><option>Review</option>
+          </select>
+          <textarea id="planDesc" rows="2" placeholder="Description…"></textarea>
+          <input id="planDate" type="date" required/>
+          <button class="btn btn-primary" type="submit">Add Task</button>
+        </form>
+      </div>
+      <div id="planList"></div>
+      <button id="planStudy" class="btn btn-primary">Plan My Study</button>
+      <div id="plannerAdvice"></div>
+    </section>
+  </main>
+
+  <!-- Chat -->
+  <button id="chatToggle">💬</button>
+  <div id="chatWidget">
+    <div id="chatHeader">
+      StudyBuddy AI
+      <button id="chatClose">✕</button>
+    </div>
+    <div id="chatBody"></div>
+    <form id="chatInput">
+      <input type="text" placeholder="Ask a question…" autocomplete="off" required/>
+      <button type="submit">➤</button>
+    </form>
+  </div>
+
+  <!-- Celebration -->
+  <div id="celebrationPopup">
+    <span class="emoji">🎉</span>
+    <h2>Great Job!</h2>
+    <p>You've completed a task!</p>
+    <button id="closeCelebration">Continue</button>
+  </div>
+
+  <script>
+    let CONFIG = {};
+    async function fetchConfig(){
+      try {
+        console.log("Fetching config…");
+        CONFIG = await (await fetch('/api/config')).json();
+        console.log("CONFIG:", CONFIG);
+      } catch(e){
+        console.error("Config fetch failed", e);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      VANTA.DOTS({
+        el:'#background',
+        mouseControls:true,touchControls:true,gyroControls:false,
+        minHeight:200,minWidth:200,scale:1,scaleMobile:1,
+        color:0x8c67ff,color2:0x4f46e5,backgroundColor:0x121212,
+        size:3,spacing:25,showLines:false
+      });
+      await fetchConfig();
+      initNav(); initQuotes(); initPomodoro(); initTasks();
+      initCafe(); initGames(); initSessions(); initPlanner(); initChat();
+    });
+
+    // NAV
+    function initNav(){
+      document.querySelectorAll('nav button').forEach(btn=>{
+        btn.onclick=()=>{
+          document.querySelector('nav button.active').classList.remove('active');
+          btn.classList.add('active');
+          document.querySelector('section.active').classList.remove('active');
+          document.getElementById(btn.dataset.target).classList.add('active');
+        };
+      });
+    }
+
+    // QUOTES
+    const quotesList = ["Start where you are.","Progress over perfection.","One step at a time.","Dream, believe, do.","Focus and win.","Every day is a second chance.","Small progress is progress.","Stay positive.","Believe you can.","Do it now.","Keep pushing.","Consistency is key.","Success is a journey.","You got this.","Make today count."];
+    function renderQuotes(){
+      const c=document.getElementById('quotes');c.innerHTML='';
+      quotesList.sort(()=>0.5-Math.random()).slice(0,3).forEach(q=>{
+        const d=document.createElement('div');d.className='card';d.textContent=`"${q}"`;c.append(d);
+      });
+    }
+    function initQuotes(){
+      renderQuotes();
+      document.getElementById('refreshQuotes').onclick=renderQuotes;
+    }
+
+    // POMODORO
+    let pomTime=25*60, pomInterval, pomRunning=false;
+    function updatePom(){
+      const m=String(Math.floor(pomTime/60)).padStart(2,'0'),
+            s=String(pomTime%60).padStart(2,'0');
+      document.getElementById('timerDisplay').textContent=`${m}:${s}`;
+      document.title=`(${m}:${s}) StudyBuddy`;
+    }
+    function initPomodoro(){
+      updatePom();
+      document.getElementById('startTimer').onclick=()=>{
+        if(pomRunning) return;
+        pomRunning=true;
+        pomInterval=setInterval(()=>{
+          if(pomTime>0){pomTime--;updatePom();}
+          else{clearInterval(pomInterval);pomRunning=false;confetti({particleCount:100,spread:70,origin:{y:0.6}});alert('Done!');document.title='StudyBuddy';}
+        },1000);
+      };
+      document.getElementById('pauseTimer').onclick=()=>{clearInterval(pomInterval);pomRunning=false;};
+      document.getElementById('resetTimer').onclick=()=>{clearInterval(pomInterval);pomRunning=false;pomTime=25*60;updatePom();};
+    }
+
+    // TASKS
+    function getTasks(){
+      let raw;
+      try{ raw=JSON.parse(localStorage.getItem('sb-tasks')); }
+      catch(e){ raw=null; console.warn("Invalid tasks data",e); }
+      let t;
+      if(Array.isArray(raw)){
+        console.log("Legacy task-array found, migrating");
+        t={todo:raw, inprogress:[], completed:[]};
+      } else if(raw && typeof raw==='object'){
+        t=raw;
+      } else {
+        t={todo:[],inprogress:[],completed:[]};
+      }
+      t.todo  = Array.isArray(t.todo) ? t.todo : [];
+      t.inprogress = Array.isArray(t.inprogress) ? t.inprogress : [];
+      t.completed  = Array.isArray(t.completed) ? t.completed : [];
+      console.log("Loaded tasks:", t);
+      return t;
+    }
+    function saveTasks(t){
+      console.log("Saving tasks:", t);
+      localStorage.setItem('sb-tasks',JSON.stringify(t));
+    }
+    function renderTasks(){
+      const all=getTasks();
+      ['todo','inprogress','completed'].forEach(status=>{
+        const col=document.querySelector(`.column[data-status="${status}"]`);
+        const title=col.querySelector('h3').textContent;
+        col.innerHTML=`<h3>${title}</h3>`;
+        all[status].forEach((txt,i)=>{
+          const task=document.createElement('div');task.className='task';
+          task.innerHTML=`
+            <span>${txt}</span>
+            <div class="task-buttons">
+              ${status==='todo'?`<button data-action="start" data-index="${i}" class="btn btn-small btn-primary">Start</button>`:''}
+              ${status==='inprogress'?`<button data-action="complete" data-index="${i}" class="btn btn-small btn-primary">Complete</button>`:''}
+              <button data-action="delete" data-status="${status}" data-index="${i}" class="btn btn-small btn-secondary">×</button>
+            </div>
+          `;
+          col.append(task);
+        });
+      });
+    }
+    function initTasks(){
+      console.log("initTasks()");
+      document.getElementById('newTaskForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        const v=document.getElementById('newTaskInput').value.trim();
+        console.log("Adding task:",v);
+        if(!v) return;
+        const all=getTasks();
+        all.todo.push(v);
+        saveTasks(all);
+        renderTasks();
+        e.target.reset();
+      });
+      document.getElementById('tasksBoard').addEventListener('click',e=>{
+        const btn=e.target.closest('button[data-action]');
+        if(!btn) return;
+        const action=btn.dataset.action;
+        const all=getTasks();
+        console.log("Task action:",action,btn.dataset);
+        if(action==='delete'){
+          all[btn.dataset.status].splice(+btn.dataset.index,1);
+        }
+        if(action==='start'){
+          const [t]=all.todo.splice(+btn.dataset.index,1);
+          all.inprogress.push(t);
+        }
+        if(action==='complete'){
+          const [t]=all.inprogress.splice(+btn.dataset.index,1);
+          all.completed.push(t);
+          confetti({particleCount:100,spread:70,origin:{y:0.6}});
+          document.getElementById('celebrationPopup').style.display='block';
+          setTimeout(()=>document.getElementById('celebrationPopup').style.display='none',3000);
+        }
+        saveTasks(all);
+        renderTasks();
+      });
+      renderTasks();
+      document.getElementById('closeCelebration').onclick=()=>{
+        document.getElementById('celebrationPopup').style.display='none';
+      };
+    }
+
+    // CAFÉ & MAP
+    function initCafe(){
+      console.log("initCafe(): injecting Google Maps");
+      const s=document.createElement('script');
+      s.src=`https://maps.googleapis.com/maps/api/js?key=${CONFIG.MAPS_API_KEY}&libraries=places`;
+      s.async=true;
+      s.onload=()=>{
+        console.log("Maps API loaded");
+        const onPos=p=>{
+          console.log("Geo success",p.coords);
+          startMap({lat:p.coords.latitude,lng:p.coords.longitude});
+        };
+        if(navigator.geolocation){
+          navigator.geolocation.getCurrentPosition(onPos,()=>{
+            console.warn("Geo fail, fallback coords");
+            startMap({lat:25.276987,lng:55.296249});
+          });
+        } else {
+          console.warn("No geo, fallback coords");
+          startMap({lat:25.276987,lng:55.296249});
+        }
+      };
+      s.onerror=e=>console.error("Maps load error",e);
+      document.head.append(s);
+
+      document.getElementById('reviewForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        const arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
+        arr.push({
+          name:document.getElementById('reviewName').value,
+          rating:+document.getElementById('reviewRating').value,
+          text:document.getElementById('reviewText').value
+        });
+        localStorage.setItem('sb-reviews',JSON.stringify(arr));
+        renderReviews();
+        e.target.reset();
+      });
+      renderReviews();
+    }
+    function startMap(pos){
+      console.log("startMap at",pos);
+      const mp=new google.maps.Map(document.getElementById('map'),{center:pos,zoom:14});
+      new google.maps.Marker({map:mp,position:pos,title:'You'});
+      const svc=new google.maps.places.PlacesService(mp);
+      svc.nearbySearch({location:pos,radius:1500,type:['cafe']},(res,st)=>{
+        console.log("PlacesService:",st,res);
+        if(st==='OK')res.forEach(p=>new google.maps.Marker({map:mp,position:p.geometry.location,title:p.name}));
+      });
+    }
+    function renderReviews(){
+      const wrap=document.getElementById('cafeReviews');
+      const arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
+      wrap.innerHTML='';
+      arr.forEach((r,i)=>{
+        const c=document.createElement('div');c.className='card';
+        c.innerHTML=`
+          <h4>${r.name}</h4>
+          <div style="color:var(--ac-warn)">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
+          <p>${r.text}</p>
+          <button data-index="${i}" class="btn btn-small btn-secondary delete-review">×</button>
+        `;
+        wrap.append(c);
+      });
+      wrap.querySelectorAll('.delete-review').forEach(btn=>{
+        btn.onclick=()=>{
+          const arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
+          arr.splice(+btn.dataset.index,1);
+          localStorage.setItem('sb-reviews',JSON.stringify(arr));
+          renderReviews();
+        };
+      });
+    }
+
+    // GAMES
+    function initGames(){
+      const sel=document.getElementById('gameSelect');
+      const games=[
+      ['Wordle Clone', 'https://wordlegame.org/'],
+    ['Hangman',      'https://hangmanwordgame.com/'],
+      ['Flappy Bird',         'https://flappybird.io/'],
+      ['Minesweeper',         'https://kamoroso94.github.io/minesweeper/'],      // :contentReference[oaicite:0]{index=0}
+      ['Sudoku',           'https://sudoku.com/'],
+      ['Connect Four',        'https://torikul007.github.io/Connect_Four/']       // :contentReference[oaicite:1]{index=1}
+      ];
+      games.forEach(g=>{
+        const o=document.createElement('option');
+        o.value=g[1]; o.textContent=g[0];
+        sel.append(o);
+      });
+      sel.onchange=()=>document.getElementById('gameFrame').src=sel.value;
+      sel.dispatchEvent(new Event('change'));
+    }
+
+    // SESSIONS
+    function initSessions(){
+      const getS=()=>JSON.parse(localStorage.getItem('sb-sessions')||'[]');
+      const saveS=a=>localStorage.setItem('sb-sessions',JSON.stringify(a));
+      const renderS=()=>{
+        const ul=document.getElementById('sessionList'),a=getS();
+        ul.innerHTML='';
+        if(!a.length){ul.innerHTML='<li class="card">No sessions.</li>';return;}
+        a.forEach((s,i)=>{
+          const li=document.createElement('li');li.className='card';li.style.marginBottom='.6rem';
+          li.innerHTML=`<strong>${s.topic}</strong> ${s.date} — ${s.duration} min
+            <button class="btn btn-small btn-secondary" onclick="(()=>{
+              const arr=getS();arr.splice(${i},1);saveS(arr);renderS();
+            })()">Delete</button>`;
+          ul.append(li);
+        });
+      };
+      document.getElementById('sessionForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        const arr=getS();
+        arr.push({
+          topic:document.getElementById('sessionTopic').value,
+          date:document.getElementById('sessionDate').value,
+          duration:+document.getElementById('sessionDuration').value
+        });
+        saveS(arr);renderS();e.target.reset();
+      });
+      renderS();
+    }
+
+    // PLANNER
+    function initPlanner(){
+      const getP=()=>JSON.parse(localStorage.getItem('sb-plans')||'[]');
+      const saveP=a=>localStorage.setItem('sb-plans',JSON.stringify(a));
+      const renderP=()=>{
+        const wrap=document.getElementById('planList'),a=getP();
+        wrap.innerHTML='';
+        a.forEach((p,i)=>{
+          const c=document.createElement('div');c.className='card';
+          c.innerHTML=`<h4>${p.title}</h4><small>${p.category} — ${p.date}</small><p>${p.desc}</p>
+                       <button class="btn btn-small btn-secondary delete-plan" data-index="${i}">×</button>`;
+          wrap.append(c);
+        });
+        wrap.querySelectorAll('.delete-plan').forEach(btn=>{
+          btn.onclick=()=>{
+            const arr=getP();arr.splice(+btn.dataset.index,1);
+            saveP(arr);renderP();
+          };
+        });
+      };
+      document.getElementById('plannerForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        const arr=getP();
+        arr.push({
+          title:document.getElementById('planTitle').value,
+          category:document.getElementById('planCat').value,
+          desc:document.getElementById('planDesc').value,
+          date:document.getElementById('planDate').value
+        });
+        saveP(arr);renderP();e.target.reset();
+      });
+      document.getElementById('planStudy').onclick=async()=>{
+        const tasks=getP();
+        if(!tasks.length){
+          document.getElementById('plannerAdvice').textContent="Please add some tasks first.";
+          return;
+        }
+        document.getElementById('plannerAdvice').textContent="Generating study plan…";
+        const msg=`I have these tasks:\n${tasks.map(t=>`- ${t.title} (${t.category}), due ${t.date}: ${t.desc}`).join('\n')}\n\nPlease give me a day-by-day schedule.`;
+        try{
+          const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+          const d=await res.json();
+          let out=d.reply||'No advice.';
+          out=out.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):/g,m=>`\n\n📅 ${m}`);
+          out=out.replace(/^\s*[-*]\s+/gm,'• ');
+          document.getElementById('plannerAdvice').textContent=out;
+        }catch{
+          document.getElementById('plannerAdvice').textContent="Error—please try again.";
+        }
+      };
+      renderP();
+    }
+
+    // CHAT
+    function initChat(){
+      const tog=document.getElementById('chatToggle'),
+            w=document.getElementById('chatWidget'),
+            cl=document.getElementById('chatClose');
+      tog.onclick=()=>w.classList.toggle('open');
+      cl.onclick=()=>w.classList.remove('open');
+      document.getElementById('chatInput').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const inp=e.target.querySelector('input'),txt=inp.value.trim();
+        if(!txt) return;
+        addChat('me',txt); inp.value='';
+        addChat('bot','...');
+        try{
+          const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:txt})});
+          const d=await res.json();
+          const ps=document.querySelectorAll('#chatBody .bot p');
+          ps[ps.length-1].textContent=d.reply||"Couldn't process.";
+        }catch{
+          const ps=document.querySelectorAll('#chatBody .bot p');
+          ps[ps.length-1].textContent="Connection error.";
+        }
+      });
+    }
+    function addChat(who,txt){
+      const b=document.getElementById('chatBody'),d=document.createElement('div');
+      d.className='row '+who; d.innerHTML=`<p>${txt}</p>`; b.append(d); b.scrollTop=b.scrollHeight;
+    }
+  </script>
+</body>
+</html>
