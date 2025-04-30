@@ -1022,6 +1022,215 @@ button:focus, input:focus, select:focus, textarea:focus {
   </div>
 
   <script>
+    // StudyBuddy Critical Fix
+// Place this script at the VERY TOP of your body tag, before any other script
+// This script specifically targets the map initialization error and form submission issues
+
+(function() {
+  console.log("StudyBuddy Critical Fix running");
+  
+  // 1. Fix the "Map container is already initialized" error
+  // We need to override the L.Map constructor to prevent multiple initializations
+  document.addEventListener('DOMContentLoaded', function() {
+    // 1. Override Leaflet Map constructor to prevent multiple initializations
+    if (window.L) {
+      console.log("Patching Leaflet Map constructor");
+      
+      // Store the original Map constructor
+      const originalMapConstructor = L.Map;
+      
+      // Replace it with our patched version
+      L.Map = function(id, options) {
+        // Check if there's already a map for this container
+        if (id && typeof id === 'string' && L.Map._instances && L.Map._instances[id]) {
+          console.warn(`Map container "${id}" is already initialized. Returning existing instance.`);
+          return L.Map._instances[id];
+        }
+        
+        // Create new instance
+        const instance = new originalMapConstructor(id, options);
+        
+        // Track instances
+        if (!L.Map._instances) L.Map._instances = {};
+        if (id && typeof id === 'string') {
+          L.Map._instances[id] = instance;
+        }
+        
+        return instance;
+      };
+      
+      // Copy prototype and properties
+      L.Map.prototype = originalMapConstructor.prototype;
+      for (const key in originalMapConstructor) {
+        if (originalMapConstructor.hasOwnProperty(key)) {
+          L.Map[key] = originalMapConstructor[key];
+        }
+      }
+      
+      // Add instance tracking
+      L.Map._instances = {};
+    }
+  });
+  
+  // 2. Fix the review form submission
+  // We'll hijack the submit event on the review form
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      const reviewForm = document.getElementById('reviewForm');
+      if (reviewForm) {
+        console.log("Applying fix to review form");
+        
+        // Clone the form to remove existing event listeners
+        const newForm = reviewForm.cloneNode(true);
+        reviewForm.parentNode.replaceChild(newForm, reviewForm);
+        
+        newForm.addEventListener('submit', function(e) {
+          console.log("Review form submission intercepted by fix");
+          e.preventDefault();
+          
+          // Get form values
+          const name = document.getElementById('reviewName').value;
+          const rating = document.getElementById('reviewRating').value;
+          const category = document.getElementById('reviewCategory').value;
+          const text = document.getElementById('reviewText').value;
+          
+          console.log("Review form values:", { name, rating, category, text });
+          
+          // Simple validation
+          if (!name || !rating || !category || !text) {
+            alert("Please fill in all fields");
+            return;
+          }
+          
+          // Create review object
+          const review = {
+            name: name,
+            rating: parseInt(rating),
+            category: category,
+            text: text,
+            date: new Date().toISOString().split('T')[0]
+          };
+          
+          // Save to localStorage
+          try {
+            // Get existing reviews
+            let reviews = [];
+            try {
+              const savedReviews = localStorage.getItem('sb-reviews');
+              if (savedReviews) {
+                reviews = JSON.parse(savedReviews);
+                // Ensure it's an array
+                if (!Array.isArray(reviews)) {
+                  console.warn("Stored reviews is not an array, resetting");
+                  reviews = [];
+                }
+              }
+            } catch (err) {
+              console.error("Error parsing saved reviews:", err);
+              reviews = [];
+            }
+            
+            // Add new review
+            reviews.push(review);
+            
+            // Save back to localStorage
+            localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+            
+            console.log("Review saved:", review);
+            console.log("All reviews:", reviews);
+            
+            // Reset form
+            newForm.reset();
+            
+            // Show success
+            alert("Review added successfully!");
+            
+            // Try to call renderReviews if it exists
+            if (typeof renderReviews === 'function') {
+              try {
+                renderReviews();
+              } catch (e) {
+                console.error("Error calling renderReviews:", e);
+              }
+            }
+          } catch (err) {
+            console.error("Error saving review:", err);
+            alert("Error saving review");
+          }
+        });
+      }
+    }, 1000); // Delay to ensure form is loaded
+  });
+  
+  // 3. Fix map initialization in initCafe
+  // We need to override initCafe to prevent duplicate initialization
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      if (typeof initCafe === 'function') {
+        console.log("Patching initCafe function");
+        
+        // Save original function
+        const originalInitCafe = initCafe;
+        
+        // Replace with our version
+        window.initCafe = function() {
+          console.log("Running patched initCafe");
+          
+          // Clean up any existing map instances
+          const mapContainer = document.getElementById('map');
+          if (mapContainer) {
+            // Clear container
+            mapContainer.innerHTML = '';
+            
+            // Remove any map instances for this container
+            if (window.L && L.Map._instances && L.Map._instances['map']) {
+              delete L.Map._instances['map'];
+            }
+          }
+          
+          // Call original function
+          try {
+            originalInitCafe.apply(this, arguments);
+          } catch (error) {
+            console.error("Error in original initCafe:", error);
+            
+            // Show fallback
+            if (mapContainer) {
+              mapContainer.innerHTML = `
+                <div style="text-align:center; padding:20px;">
+                  <h3>Map loading error</h3>
+                  <p>There was a problem loading the map. Please refresh the page to try again.</p>
+                  <button onclick="location.reload()" style="background:#8c67ff; color:white; 
+                          border:none; padding:10px 20px; border-radius:4px; cursor:pointer; margin-top:10px;">
+                    Refresh Page
+                  </button>
+                </div>
+              `;
+            }
+          }
+        };
+      }
+    }, 500);
+  });
+  
+  // 4. Fix the selectCafeForReview function
+  window.selectCafeForReview = function(cafeName) {
+    console.log("selectCafeForReview called with:", cafeName);
+    
+    const reviewNameInput = document.getElementById('reviewName');
+    if (reviewNameInput) {
+      reviewNameInput.value = cafeName;
+      
+      // Scroll to form
+      const reviewForm = document.getElementById('reviewForm');
+      if (reviewForm) {
+        reviewForm.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+  
+  console.log("StudyBuddy Critical Fix loaded");
+})();
     // StudyBuddy Targeted Error Fix
 // This script targets ONLY the specific errors shown in the screenshots
 // Add this at the very beginning of your HTML body (before any other script)
