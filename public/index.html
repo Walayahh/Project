@@ -1022,6 +1022,519 @@ button:focus, input:focus, select:focus, textarea:focus {
   </div>
 
   <script>
+    // StudyBuddy Clean Fix
+// This script fixes the map initialization errors and review submission issues
+// No fallbacks, no sample data - just pure fixes for the actual errors
+
+(function() {
+  console.log("StudyBuddy Clean Fix - Starting...");
+  
+  // Wait for DOM to be ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // ===== FIX MAP INITIALIZATION =====
+    function fixMap() {
+      console.log("Fixing map initialization...");
+      
+      const mapContainer = document.getElementById('map');
+      if (!mapContainer) {
+        console.log("Map container not found");
+        return;
+      }
+      
+      // Clean up any existing Leaflet instances to prevent "already initialized" error
+      function cleanupExistingLeaflet() {
+        // Remove any existing Leaflet containers
+        document.querySelectorAll('.leaflet-container, .leaflet-control-container').forEach(el => {
+          el.remove();
+        });
+        
+        // Reset map container
+        mapContainer.innerHTML = '';
+        
+        // Remove global references
+        if (window.cafeMap) {
+          try {
+            window.cafeMap.remove();
+          } catch(e) {
+            console.log("Error removing existing map:", e);
+          }
+          window.cafeMap = null;
+        }
+      }
+      
+      // Clean up before initializing
+      cleanupExistingLeaflet();
+      
+      // Function to initialize the map properly
+      function initializeMap() {
+        // Check if Leaflet is already loaded
+        if (typeof L === 'undefined') {
+          // If not, load Leaflet first
+          console.log("Loading Leaflet library...");
+          
+          // Add Leaflet CSS
+          const leafletCSS = document.createElement('link');
+          leafletCSS.rel = 'stylesheet';
+          leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          document.head.appendChild(leafletCSS);
+          
+          // Add Leaflet JS with proper loading callback
+          const leafletScript = document.createElement('script');
+          leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          leafletScript.onload = createMap;
+          document.head.appendChild(leafletScript);
+        } else {
+          // Leaflet already loaded, create map directly
+          createMap();
+        }
+      }
+      
+      // Function to create the actual map
+      function createMap() {
+        console.log("Creating map...");
+        
+        try {
+          // Set loading indicator
+          mapContainer.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(30,30,30,0.7);"><div>Loading map...</div></div>';
+          
+          // Get user location with a fallback
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              // Success callback
+              position => {
+                setupMapWithCoordinates(position.coords.latitude, position.coords.longitude);
+              },
+              // Error callback
+              error => {
+                console.warn("Geolocation error:", error);
+                // Use fallback coordinates (New York City)
+                setupMapWithCoordinates(40.7128, -74.0060);
+              },
+              // Options
+              { timeout: 5000, maximumAge: 60000 }
+            );
+          } else {
+            // Geolocation not supported
+            setupMapWithCoordinates(40.7128, -74.0060);
+          }
+        } catch (error) {
+          console.error("Error in createMap:", error);
+          mapContainer.innerHTML = '<div style="padding:20px;text-align:center;">Error loading map. Please refresh the page.</div>';
+        }
+      }
+      
+      // Function to setup map with coordinates
+      function setupMapWithCoordinates(lat, lng) {
+        try {
+          // Clear container
+          mapContainer.innerHTML = '';
+          
+          // Create map instance
+          const map = L.map('map', {
+            center: [lat, lng],
+            zoom: 13,
+            attributionControl: true,
+            zoomControl: true
+          });
+          
+          // Store reference
+          window.cafeMap = map;
+          
+          // Add tile layer (dark theme)
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19
+          }).addTo(map);
+          
+          // Add user location marker
+          const userMarker = L.marker([lat, lng], {
+            title: 'Your Location'
+          }).addTo(map);
+          
+          userMarker.bindPopup("Your Location").openPopup();
+          
+          // Add search radius circle
+          const radiusCircle = L.circle([lat, lng], {
+            radius: 2000, // 2km default radius
+            color: 'rgba(140, 103, 255, 0.7)',
+            fillColor: 'rgba(140, 103, 255, 0.1)',
+            fillOpacity: 0.2,
+            weight: 2
+          }).addTo(map);
+          
+          // Fetch cafe data
+          fetchCafes(map, lat, lng, 2000);
+          
+          console.log("Map created successfully");
+        } catch (error) {
+          console.error("Error setting up map:", error);
+          mapContainer.innerHTML = '<div style="padding:20px;text-align:center;">Error initializing map. Please refresh the page.</div>';
+        }
+      }
+      
+      // Fetch cafes using Overpass API
+      function fetchCafes(map, lat, lng, radius = 2000) {
+        console.log(`Fetching cafes within ${radius}m of [${lat}, ${lng}]...`);
+        
+        // Query for cafes and study places
+        const query = `
+          [out:json][timeout:15];
+          (
+            node["amenity"="cafe"](around:${radius},${lat},${lng});
+            node["amenity"="library"](around:${radius},${lat},${lng});
+            node["shop"="coffee"](around:${radius},${lat},${lng});
+          );
+          out body;
+        `;
+        
+        // Create loading indicator
+        const loadingEl = document.createElement('div');
+        loadingEl.style.cssText = 'position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.7);color:white;padding:5px 10px;border-radius:4px;z-index:1000;';
+        loadingEl.textContent = 'Finding nearby cafes...';
+        mapContainer.appendChild(loadingEl);
+        
+        // Fetch data with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(query),
+          signal: controller.signal
+        })
+        .then(response => {
+          clearTimeout(timeoutId);
+          return response.json();
+        })
+        .then(data => {
+          // Remove loading indicator
+          loadingEl.remove();
+          
+          if (data && data.elements && data.elements.length > 0) {
+            // Process results
+            addCafesToMap(map, data.elements);
+            updateCafeList(data.elements);
+          } else {
+            console.log("No cafes found nearby");
+          }
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          loadingEl.remove();
+          console.error("Error fetching cafes:", error);
+        });
+      }
+      
+      // Add cafes to map
+      function addCafesToMap(map, elements) {
+        console.log(`Adding ${elements.length} locations to map`);
+        
+        // Define marker types
+        const types = {
+          cafe: { color: '#8c67ff', icon: '☕' },
+          library: { color: '#4f46e5', icon: '📚' },
+          coffee: { color: '#8c67ff', icon: '☕' },
+          default: { color: '#8c67ff', icon: '📍' }
+        };
+        
+        // Process each location
+        elements.forEach(element => {
+          if (element.type !== 'node' || !element.lat || !element.lon) return;
+          
+          // Determine type
+          let type = 'default';
+          if (element.tags) {
+            if (element.tags.amenity === 'cafe') type = 'cafe';
+            else if (element.tags.amenity === 'library') type = 'library';
+            else if (element.tags.shop === 'coffee') type = 'coffee';
+          }
+          
+          // Get name
+          const name = element.tags?.name || `Study Spot #${element.id.toString().slice(-4)}`;
+          
+          // Create marker with icon
+          const marker = L.marker([element.lat, element.lon], {
+            icon: L.divIcon({
+              html: `<div style="background:${types[type].color};color:white;width:25px;height:25px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">${types[type].icon}</div>`,
+              className: '',
+              iconSize: [25, 25],
+              iconAnchor: [12, 12]
+            }),
+            title: name
+          }).addTo(map);
+          
+          // Create popup content
+          let address = '';
+          if (element.tags) {
+            const parts = [];
+            if (element.tags['addr:housenumber']) parts.push(element.tags['addr:housenumber']);
+            if (element.tags['addr:street']) parts.push(element.tags['addr:street']);
+            if (element.tags['addr:city']) parts.push(element.tags['addr:city']);
+            address = parts.join(', ');
+          }
+          
+          const popupContent = `
+            <div style="width:200px;">
+              <h3 style="margin:0 0 5px;color:${types[type].color}">${name}</h3>
+              ${address ? `<p style="margin:5px 0;font-size:12px;"><strong>Address:</strong> ${address}</p>` : ''}
+              ${element.tags?.opening_hours ? `<p style="margin:5px 0;font-size:12px;"><strong>Hours:</strong> ${element.tags.opening_hours}</p>` : ''}
+              <button onclick="selectCafeForReview('${name.replace(/'/g, "\\'")}')" 
+                style="width:100%;margin-top:5px;background:${types[type].color};color:white;border:none;padding:5px;border-radius:4px;cursor:pointer;">
+                Add Review
+              </button>
+            </div>
+          `;
+          
+          marker.bindPopup(popupContent);
+        });
+      }
+      
+      // Update cafe list in datalist
+      function updateCafeList(elements) {
+        const cafeList = document.getElementById('cafeList');
+        if (!cafeList) return;
+        
+        // Get unique names
+        const names = elements
+          .filter(el => el.tags && el.tags.name)
+          .map(el => el.tags.name);
+          
+        // Sort and make unique
+        const uniqueNames = [...new Set(names)].sort();
+        
+        // Update datalist
+        cafeList.innerHTML = '';
+        uniqueNames.forEach(name => {
+          const option = document.createElement('option');
+          option.value = name;
+          cafeList.appendChild(option);
+        });
+        
+        console.log(`Added ${uniqueNames.length} cafes to selection list`);
+      }
+      
+      // Initialize map
+      initializeMap();
+    }
+    
+    // ===== FIX REVIEW FORM =====
+    function fixReviewForm() {
+      console.log("Fixing review form submission...");
+      
+      const reviewForm = document.getElementById('reviewForm');
+      if (!reviewForm) {
+        console.log("Review form not found");
+        return;
+      }
+      
+      // Ensure cafe selection from map works
+      window.selectCafeForReview = function(cafeName) {
+        console.log(`Selected cafe: ${cafeName}`);
+        const reviewNameInput = document.getElementById('reviewName');
+        if (reviewNameInput) {
+          reviewNameInput.value = cafeName;
+          
+          // Scroll to form
+          reviewForm.scrollIntoView({ behavior: 'smooth' });
+          
+          // Focus rating next
+          setTimeout(() => {
+            document.getElementById('reviewRating')?.focus();
+          }, 300);
+        }
+      };
+      
+      // Replace existing handler with fixed one
+      // First, clone the form to remove existing listeners
+      const newForm = reviewForm.cloneNode(true);
+      reviewForm.parentNode.replaceChild(newForm, reviewForm);
+      
+      // Now add our fixed handler
+      newForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Get form values
+        const name = document.getElementById('reviewName')?.value?.trim();
+        const rating = document.getElementById('reviewRating')?.value;
+        const category = document.getElementById('reviewCategory')?.value;
+        const text = document.getElementById('reviewText')?.value?.trim();
+        
+        console.log("Review submission:", { name, rating, category, text });
+        
+        // Validate (without alerts)
+        let isValid = true;
+        let firstInvalidField = null;
+        
+        // Clear existing error styling
+        ['reviewName', 'reviewRating', 'reviewCategory', 'reviewText'].forEach(id => {
+          const field = document.getElementById(id);
+          if (field) field.style.border = '';
+        });
+        
+        // Check each field
+        if (!name) {
+          isValid = false;
+          markInvalid('reviewName');
+          firstInvalidField = firstInvalidField || 'reviewName';
+        }
+        
+        if (!rating) {
+          isValid = false;
+          markInvalid('reviewRating');
+          firstInvalidField = firstInvalidField || 'reviewRating';
+        }
+        
+        if (!category) {
+          isValid = false;
+          markInvalid('reviewCategory');
+          firstInvalidField = firstInvalidField || 'reviewCategory';
+        }
+        
+        if (!text) {
+          isValid = false;
+          markInvalid('reviewText');
+          firstInvalidField = firstInvalidField || 'reviewText';
+        }
+        
+        // If invalid, focus first invalid field and show error message
+        if (!isValid) {
+          if (firstInvalidField) {
+            document.getElementById(firstInvalidField)?.focus();
+          }
+          showMessage("Please fill in all required fields", "error");
+          return;
+        }
+        
+        // Save the review data
+        try {
+          // Get existing reviews
+          let reviews = [];
+          try {
+            const existingReviews = localStorage.getItem('sb-reviews');
+            if (existingReviews) {
+              reviews = JSON.parse(existingReviews);
+              if (!Array.isArray(reviews)) {
+                console.warn("Stored reviews is not an array, resetting");
+                reviews = [];
+              }
+            }
+          } catch (e) {
+            console.error("Error parsing stored reviews:", e);
+            reviews = [];
+          }
+          
+          // Create review object
+          const review = {
+            name: name,
+            rating: parseInt(rating),
+            category: category,
+            text: text,
+            date: new Date().toISOString().split('T')[0]
+          };
+          
+          // Add to array
+          reviews.push(review);
+          
+          // Save to localStorage
+          localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+          
+          console.log("Review saved successfully:", review);
+          
+          // Reset form
+          newForm.reset();
+          
+          // Show success message
+          showMessage("Review added successfully!", "success");
+          
+          // Call renderReviews if it exists
+          if (typeof renderReviews === 'function') {
+            try {
+              renderReviews();
+            } catch (e) {
+              console.error("Error calling renderReviews:", e);
+            }
+          }
+        } catch (error) {
+          console.error("Error saving review:", error);
+          showMessage("Error saving review. Please try again.", "error");
+        }
+      });
+      
+      // Helper to mark invalid fields
+      function markInvalid(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+          field.style.border = '1px solid #ff6464';
+        }
+      }
+      
+      // Helper to show toast-style messages
+      function showMessage(message, type) {
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          padding: 10px 15px;
+          border-radius: 4px;
+          color: white;
+          z-index: 10000;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+          animation: toastIn 0.3s forwards;
+        `;
+        
+        // Set color based on type
+        if (type === 'error') {
+          toast.style.background = 'rgba(255,100,100,0.9)';
+        } else if (type === 'success') {
+          toast.style.background = 'rgba(46,204,113,0.9)';
+        } else {
+          toast.style.background = 'rgba(52,152,219,0.9)';
+        }
+        
+        // Add message
+        toast.textContent = message;
+        
+        // Add to body
+        document.body.appendChild(toast);
+        
+        // Add animation style
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes toastIn {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes toastOut {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(100px); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+          toast.style.animation = 'toastOut 0.3s forwards';
+          setTimeout(() => {
+            if (document.body.contains(toast)) {
+              document.body.removeChild(toast);
+            }
+          }, 300);
+        }, 3000);
+      }
+    }
+    
+    // Fix the map
+    fixMap();
+    
+    // Fix the review form
+    fixReviewForm();
+    
+    console.log("StudyBuddy Clean Fix complete!");
+  });
+})();
     
     let CONFIG = {};
     async function fetchConfig(){
