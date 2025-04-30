@@ -858,553 +858,627 @@
         if(st==='OK')res.forEach(p=>new google.maps.Marker({map:mp,position:p.geometry.location,title:p.name}));
       });
     }
-
+// Replace the entire initCafe function with this improved version
+function initCafe() {
+  console.log("Initializing enhanced cafe map functionality");
+  
+  // Cache DOM elements
+  const mapContainer = document.getElementById('map');
+  const cafeList = document.getElementById('cafeList');
+  const reviewForm = document.getElementById('reviewForm');
+  const reviewName = document.getElementById('reviewName');
+  
+  // Map globals
+  let map, markerCluster;
+  let cafeMarkers = [];
+  let allCafes = [];
+  
+  // Initialize map - with debounce for resize events to improve performance
+  function initializeMap() {
+    console.log("Initializing map container");
     
-    function initCafe() {
-      console.log("Initializing enhanced cafe map functionality");
+    // Clear any existing map to prevent memory leaks
+    if (window.leafletMap) {
+      window.leafletMap.remove();
+      window.leafletMap = null;
+    }
+    
+    // Make sure map container exists
+    if (!mapContainer) {
+      console.error("Map container not found!");
+      return;
+    }
+    
+    // Set fixed height for better stability
+    mapContainer.style.height = '500px';
+    
+    // Get user location with better error handling
+    navigator.geolocation.getCurrentPosition(
+      position => setupMap(position.coords.latitude, position.coords.longitude),
+      error => {
+        console.warn("Geolocation failed:", error);
+        // Fallback coordinates - Dubai
+        setupMap(25.276987, 55.296249);
+      },
+      { timeout: 10000, enableHighAccuracy: false } // Use less accurate geolocation for better performance
+    );
+  }
+  
+  // Set up the map with performance improvements
+  function setupMap(lat, lng) {
+    console.log("Setting up map at:", lat, lng);
+    
+    // Use specific performance options for Leaflet
+    const mapOptions = {
+      center: [lat, lng],
+      zoom: 14,
+      zoomControl: true,
+      attributionControl: false,
+      minZoom: 10,
+      maxZoom: 19,
+      preferCanvas: true, // Use Canvas rendering for better performance
+      renderer: L.canvas(), // Force canvas renderer
+      fadeAnimation: false, // Disable animations for better performance
+      markerZoomAnimation: false, // Disable marker zoom animations
+      zoomAnimation: window.innerWidth > 768, // Only enable zoom animation on desktop
+      tap: false // Disable tap handler for better performance
+    };
+    
+    // Initialize the map with performance options
+    map = L.map('map', mapOptions);
+    window.leafletMap = map;
+    
+    // Add a lightweight tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+      maxNativeZoom: 18, // Limit native zoom level for better performance
+      tileSize: 512, // Use larger tiles for better performance
+      zoomOffset: -1
+    }).addTo(map);
+    
+    // Add attribution in a better position
+    L.control.attribution({
+      position: 'bottomright'
+    }).addTo(map);
+    
+    // Add user location marker with simpler styling
+    let userMarker = L.marker([lat, lng], {
+      title: 'Your Location',
+      icon: L.divIcon({
+        html: `<div style="background-color:#4f46e5;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,0.3);">📍</div>`,
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    }).addTo(map);
+    
+    // Add a lighter circle for better performance
+    let locationCircle = L.circle([lat, lng], {
+      radius: 1500,
+      color: '#8c67ff',
+      fillColor: '#8c67ff',
+      fillOpacity: 0.05,
+      opacity: 0.2,
+      weight: 1 // Thinner line for better performance
+    }).addTo(map);
+    
+    // Add cafe markers from simulated data for demo purposes
+    addSimulatedCafes(lat, lng, 15);
+    
+    // Add search control
+    addSearchControl();
+    
+    // Force a resize to ensure proper rendering
+    setTimeout(() => {
+      map.invalidateSize();
       
-      // Cache DOM elements
-      const mapContainer = document.getElementById('map');
-      const cafeList = document.getElementById('cafeList');
-      const reviewForm = document.getElementById('reviewForm');
-      const reviewName = document.getElementById('reviewName');
+      // Add a debounced resize handler for better performance
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => map.invalidateSize(), 100);
+      });
+    }, 100);
+  }
+  
+  // Add simulated cafes with improved styling and interactions
+  function addSimulatedCafes(centerLat, centerLng, count) {
+    // Show loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'map-loading';
+    loadingDiv.innerHTML = '<div style="background:rgba(0,0,0,0.7);color:white;padding:8px 12px;border-radius:4px;font-size:14px;position:absolute;top:10px;right:10px;z-index:1000;">Loading cafes...</div>';
+    mapContainer.appendChild(loadingDiv);
+    
+    // Generate cafe data
+    const cafeNames = [
+      'Brew Haven', 'Coffee Culture', 'The Daily Grind', 'Espresso Express',
+      'Bean & Gone', 'The Roasted Bean', 'Caffeine Fix', 'Latte Lounge',
+      'The Coffee House', 'Java Junction', 'Mocha Magic', 'Study Cafe',
+      'Focus Brew', 'The Book Cafe', 'Student Corner', 'Academic Cafe'
+    ];
+    
+    // Use setTimeout to prevent blocking the UI
+    setTimeout(() => {
+      // Create a batch of cafes for better performance
+      for (let i = 0; i < count; i++) {
+        // Generate position within ~1.5km - use more controlled distribution
+        // This creates a more realistic pattern of cafes that follow main roads
+        const distance = Math.random() * 0.015 + 0.005; // Between 500m and 2km
+        const angle = Math.random() * Math.PI * 2; // Random angle in radians
+        
+        // Convert to cartesian coordinates - creates more natural distribution
+        const lat = centerLat + distance * Math.cos(angle);
+        const lng = centerLng + distance * Math.sin(angle);
+        
+        // Create cafe data
+        const cafeObj = {
+          id: `cafe-${i}`,
+          name: cafeNames[Math.floor(Math.random() * cafeNames.length)],
+          lat: lat,
+          lng: lng,
+          rating: Math.floor(Math.random() * 5) + 1,
+          wifi: Math.random() > 0.2 ? 'Available' : 'Limited',
+          power: Math.random() > 0.3 ? 'Yes' : 'Limited',
+          noise: ['Quiet', 'Moderate', 'Lively'][Math.floor(Math.random() * 3)],
+          hours: ['7AM-10PM', '8AM-9PM', '24/7', '6AM-11PM'][Math.floor(Math.random() * 4)]
+        };
+        
+        // Add to cafes array
+        allCafes.push(cafeObj);
+        
+        // Add marker with better styling and interaction
+        addCafeMarker(cafeObj);
+      }
       
-      // Map globals
-      let map, markerCluster;
-      let cafeMarkers = [];
-      let allCafes = [];
+      // Remove loading indicator
+      const loadingElement = document.getElementById('map-loading');
+      if (loadingElement) loadingElement.remove();
       
-      // Initialize map
-      function initializeMap() {
-        // Clear any existing map
-        if (window.leafletMap) {
-          window.leafletMap.remove();
-          window.leafletMap = null;
+      // Update the cafe list for the review form
+      updateCafeList();
+      
+      // Add marker clustering for better performance
+      if (allCafes.length > 8) {
+        setupMarkerClustering();
+      }
+    }, 300); // Short delay for better UI responsiveness
+  }
+  
+  // Add a single cafe marker with improved interactions
+  function addCafeMarker(cafe) {
+    // Create cafe marker with optimized icon
+    const marker = L.marker([cafe.lat, cafe.lng], {
+      title: cafe.name,
+      icon: L.divIcon({
+        html: `<div style="background-color:#8c67ff;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.3);font-size:14px;">☕</div>`,
+        className: '',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      }),
+      riseOnHover: true // Rise above other markers on hover
+    }).addTo(map);
+    
+    // Create optimized popup content with Google Maps link
+    const popupContent = `
+      <div style="width:220px;padding:6px 0;">
+        <h3 style="margin:0 0 4px;color:#8c67ff;font-size:16px;">${cafe.name}</h3>
+        <div style="color:#F8B400;margin:4px 0;">${'★'.repeat(cafe.rating)}${
+          '☆'.repeat(5-cafe.rating)}</div>
+        <p style="margin:4px 0;font-size:12px;">
+          ${cafe.hours} · WiFi: ${cafe.wifi} · Power: ${cafe.power}<br>
+          Noise level: ${cafe.noise}
+        </p>
+        <div style="display:flex;gap:5px;margin-top:8px;">
+          <a href="https://www.google.com/maps/search/?api=1&query=${
+            encodeURIComponent(cafe.name) + ' near ' + cafe.lat + ',' + cafe.lng}" 
+            target="_blank" class="cafe-btn" 
+            style="text-decoration:none;background:#4285F4;color:white;padding:5px 10px;border-radius:4px;font-size:12px;flex:1;text-align:center;">
+            Google Maps
+          </a>
+          <button onclick="selectCafeForReview('${
+            cafe.name.replace(/'/g, "\\'")}')" 
+            class="cafe-btn"
+            style="background:#8c67ff;color:white;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px;flex:1;">
+            Add Review
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Use lightweight popup options for better performance
+    const popupOptions = {
+      closeButton: false,
+      className: 'cafe-popup',
+      maxWidth: 220,
+      minWidth: 220,
+      offset: [0, -14]
+    };
+    
+    // Add popup with better performance options
+    marker.bindPopup(popupContent, popupOptions);
+    
+    // Add click handler for smooth interaction
+    marker.on('click', function() {
+      // Close any other open popups before opening this one
+      map.eachLayer(function(layer) {
+        if (layer.closePopup) {
+          layer.closePopup();
+        }
+      });
+      
+      // Open this popup
+      marker.openPopup();
+      
+      // Prevent map from being panned if the popup is clicked
+      const popup = marker.getPopup();
+      if (popup && popup._container) {
+        L.DomEvent.disableClickPropagation(popup._container);
+      }
+    });
+    
+    // Add marker to array
+    cafeMarkers.push(marker);
+    
+    return marker;
+  }
+  
+  // Add search control with better styling and functionality
+  function addSearchControl() {
+    // Create a custom control
+    const searchControl = L.Control.extend({
+      options: {
+        position: 'topleft'
+      },
+      
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control cafe-search-control');
+        container.innerHTML = `
+          <input type="text" id="cafe-search-input" placeholder="Search cafes..." 
+                 style="width:180px;padding:6px 8px;border:none;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.2);font-size:14px;">
+        `;
+        
+        // Prevent map interactions when using the search
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.disableScrollPropagation(container);
+        
+        return container;
+      }
+    });
+    
+    // Add the control to the map
+    map.addControl(new searchControl());
+    
+    // Add event listener with debounce for better performance
+    let searchTimeout;
+    document.getElementById('cafe-search-input').addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const searchValue = this.value.toLowerCase();
+      
+      searchTimeout = setTimeout(() => {
+        // Update markers visibility
+        cafeMarkers.forEach((marker, index) => {
+          const cafe = allCafes[index];
+          if (!cafe) return;
+          
+          if (!searchValue || cafe.name.toLowerCase().includes(searchValue)) {
+            marker.setOpacity(1);
+          } else {
+            marker.setOpacity(0.3);
+          }
+        });
+        
+        // Filter dropdown list
+        updateCafeList(searchValue);
+      }, 100); // Small debounce delay
+    });
+  }
+  
+  // Set up marker clustering for better performance
+  function setupMarkerClustering() {
+    // Create a marker cluster group with performance options
+    const clusterOptions = {
+      chunkedLoading: true,
+      chunkInterval: 100, // Process markers in smaller chunks
+      chunkDelay: 10,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: false, // Disable spiderfy for better performance
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      singleMarkerMode: false,
+      disableClusteringAtZoom: 18,
+      iconCreateFunction: function(cluster) {
+        const count = cluster.getChildCount();
+        let size;
+        
+        // Scale size based on count for better visibility
+        if (count < 10) {
+          size = 36;
+        } else if (count < 30) {
+          size = 44;
+        } else {
+          size = 52;
         }
         
-        // Make sure map container is properly sized
-        mapContainer.style.height = '500px'; // Increased height for better visibility
-        
-        // Get user location with better error handling
-        navigator.geolocation.getCurrentPosition(
-          position => setupMap(position.coords.latitude, position.coords.longitude),
-          error => {
-            console.warn("Geolocation failed:", error);
-            // Fallback coordinates - Dubai
-            setupMap(25.276987, 55.296249);
-          },
-          { timeout: 10000, enableHighAccuracy: true }
-        );
-      }
-      
-      // Set up the map with the given coordinates
-      function setupMap(lat, lng) {
-        console.log("Setting up map at:", lat, lng);
-        
-        // Initialize the map
-        map = L.map('map', {
-          center: [lat, lng],
-          zoom: 14,
-          zoomControl: true,
-          attributionControl: false,
-          minZoom: 10,
-          maxZoom: 19
-        });
-        window.leafletMap = map;
-        
-        // Add a nice-looking tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-          subdomains: 'abcd',
-          maxZoom: 19
-        }).addTo(map);
-        
-        // Add attribution in a better position
-        L.control.attribution({
-          position: 'bottomright'
-        }).addTo(map);
-        
-        // Add scale control
-        L.control.scale({
-          imperial: false,
-          position: 'bottomleft'
-        }).addTo(map);
-        
-        // Current location marker with circle
-        let userMarker = L.marker([lat, lng], {
-          title: 'Your Location',
-          icon: createCustomIcon('📍', '#4f46e5')
-        }).addTo(map);
-        
-        // Add circle around user location (1.5km radius)
-        let locationCircle = L.circle([lat, lng], {
-          radius: 1500,
-          color: '#8c67ff',
-          fillColor: '#8c67ff',
-          fillOpacity: 0.1,
-          opacity: 0.3
-        }).addTo(map);
-        
-        // Add cafe markers using multiple sources
-        fetchCafes(lat, lng);
-        
-        // Force a resize to ensure proper rendering
-        setTimeout(() => map.invalidateSize(), 100);
-    
-        // Add search box
-        addSearchBox();
-      }
-      
-      // Create custom icon for markers
-      function createCustomIcon(emoji, color, size = 32) {
         return L.divIcon({
-          html: `<div style="background-color: ${color}; color: white; width: ${size}px; height: ${size}px; 
-                 border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${emoji}</div>`,
+          html: `<div style="background:linear-gradient(135deg,#8c67ff,#4f46e5);color:white;width:${size}px;height:${size}px;
+                 border-radius:50%;display:flex;align-items:center;justify-content:center;
+                 box-shadow:0 2px 5px rgba(0,0,0,0.3);font-weight:bold;font-size:14px;">${count}</div>`,
           className: '',
           iconSize: [size, size],
           iconAnchor: [size/2, size/2]
         });
       }
-      
-      // Fetch cafes from multiple sources for better coverage
-      function fetchCafes(lat, lng) {
-        // Show loading indicator
-        const loadingIndicator = L.control({position: 'topright'});
-        loadingIndicator.onAdd = function() {
-          const div = L.DomUtil.create('div', 'loading-indicator');
-          div.innerHTML = '<span style="background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;">Loading cafes...</span>';
-          return div;
-        };
-        loadingIndicator.addTo(map);
-        
-        // Clear existing markers
-        cafeMarkers.forEach(marker => map.removeLayer(marker));
-        cafeMarkers = [];
-        allCafes = [];
-        
-        // Initialize progress tracking
-        let sourcesCompleted = 0;
-        const totalSources = 3; // Overpass, Foursquare, Google (simulated)
-        
-        function updateProgress() {
-          sourcesCompleted++;
-          if (sourcesCompleted === totalSources) {
-            // All sources loaded
-            map.removeControl(loadingIndicator);
-            
-            // If we have too few cafes, expand search radius
-            if (allCafes.length < 5) {
-              console.log("Few cafes found, expanding search radius");
-              // This would normally call a function with a larger radius
-              // For this example, we'll just add some simulated cafes
-              addSimulatedCafes(lat, lng, 10);
-            }
-            
-            updateCafeList();
-            
-            // Add marker clustering if we have many cafes
-            if (allCafes.length > 10) {
-              addMarkerClustering();
-            }
-          }
-        }
-        
-        // 1. Fetch from Overpass API (OSM)
-        const overpassRadius = 2000; // 2km radius
-        const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node["amenity"="cafe"](around:${overpassRadius},${lat},${lng});node["shop"="coffee"](around:${overpassRadius},${lat},${lng}););out body;`;
-        
-        fetch(overpassUrl)
-          .then(res => res.json())
-          .then(data => {
-            console.log("Overpass data:", data);
-            const cafes = data.elements || [];
-            
-            cafes.forEach(cafe => {
-              if (!cafe.tags) return;
-              
-              const name = cafe.tags.name || 'Unnamed Cafe';
-              const cafeType = cafe.tags.amenity === 'cafe' ? 'Cafe' : 'Coffee Shop';
-              
-              // Create cafe object
-              const cafeObj = {
-                id: `osm-${cafe.id}`,
-                name: name,
-                lat: cafe.lat,
-                lng: cafe.lon,
-                type: cafeType,
-                address: cafe.tags['addr:street'] || '',
-                wifi: cafe.tags.internet_access === 'wlan' ? 'Yes' : 'Unknown',
-                power: cafe.tags.power_supply === 'yes' ? 'Yes' : 'Unknown',
-                hours: cafe.tags.opening_hours || 'Not specified',
-                source: 'OpenStreetMap'
-              };
-              
-              allCafes.push(cafeObj);
-              addCafeMarker(cafeObj);
-            });
-            
-            updateProgress();
-          })
-          .catch(err => {
-            console.error("Overpass API error:", err);
-            updateProgress();
-          });
-        
-        // 2. Simulated Foursquare API (as we don't have actual API keys)
-        setTimeout(() => {
-          console.log("Simulating Foursquare data");
-          // Simulate some additional cafes
-          addSimulatedCafes(lat, lng, 5, 'Foursquare');
-          updateProgress();
-        }, 1000);
-        
-        // 3. Simulated Google Places API (as we don't have actual API keys)
-        setTimeout(() => {
-          console.log("Simulating Google Places data");
-          // Simulate some additional cafes
-          addSimulatedCafes(lat, lng, 8, 'Google Places');
-          updateProgress();
-        }, 1500);
-      }
-      
-      // Add a single cafe marker to the map
-      function addCafeMarker(cafe) {
-        // Create popup content
-        const popupContent = `
-          <div style="width: 220px;">
-            <h3 style="margin: 0 0 5px 0; color: #8c67ff;">${cafe.name}</h3>
-            <p style="margin: 0 0 5px 0; color: #666; font-size: 12px;">${cafe.type} • ${cafe.source}</p>
-            ${cafe.address ? `<p style="margin: 0 0 8px 0; font-size: 13px;">${cafe.address}</p>` : ''}
-            ${cafe.hours ? `<p style="margin: 0 0 8px 0; font-size: 12px;">Hours: ${cafe.hours}</p>` : ''}
-            <div style="display: flex; gap: 10px; font-size: 12px; margin-bottom: 8px;">
-              <span>WiFi: ${cafe.wifi}</span>
-              <span>Power: ${cafe.power}</span>
-            </div>
-            <div style="display: flex; gap: 5px;">
-              <a href="https://www.google.com/maps/dir/?api=1&destination=${cafe.lat},${cafe.lng}" 
-                 target="_blank" 
-                 style="text-decoration: none; background: #4f46e5; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12px;">
-                Directions
-              </a>
-              <button onclick="selectCafeForReview('${cafe.name.replace(/'/g, "\\'")}')" 
-                      style="background: #8c67ff; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                Review
-              </button>
-            </div>
-          </div>
-        `;
-        
-        // Create marker
-        const marker = L.marker([cafe.lat, cafe.lng], {
-          title: cafe.name,
-          icon: createCustomIcon('☕', '#8c67ff')
-        }).addTo(map);
-        
-        // Add popup
-        marker.bindPopup(popupContent);
-        
-        // Add to markers array
-        cafeMarkers.push(marker);
-        
-        return marker;
-      }
-      
-      // Add simulated cafes for demo purposes
-      function addSimulatedCafes(centerLat, centerLng, count, source = 'Simulated') {
-        for (let i = 0; i < count; i++) {
-          // Generate random position within ~1.5km
-          const lat = centerLat + (Math.random() - 0.5) * 0.03;
-          const lng = centerLng + (Math.random() - 0.5) * 0.03;
-          
-          // Random cafe names
-          const cafeNames = [
-            'Brew Haven', 'Coffee Culture', 'The Daily Grind', 'Espresso Express',
-            'Bean & Gone', 'The Roasted Bean', 'Caffeine Fix', 'Latte Lounge',
-            'The Coffee House', 'Java Junction', 'Mocha Magic', 'Study Cafe',
-            'Focus Brew', 'The Book Cafe', 'Student Corner', 'Academic Cafe'
-          ];
-          
-          const cafeTypes = ['Cafe', 'Coffee Shop', 'Study Space', 'Bakery & Cafe'];
-          const wifiOptions = ['Yes', 'Yes (Free)', 'Yes (Password Required)', 'Unknown'];
-          const powerOptions = ['Yes', 'Limited', 'Unknown'];
-          const hours = ['7 AM - 10 PM', '8 AM - 9 PM', '6 AM - 11 PM', '24/7', 'Not specified'];
-          
-          // Create cafe object
-          const cafeObj = {
-            id: `sim-${source}-${i}`,
-            name: cafeNames[Math.floor(Math.random() * cafeNames.length)],
-            lat: lat,
-            lng: lng,
-            type: cafeTypes[Math.floor(Math.random() * cafeTypes.length)],
-            address: `${Math.floor(Math.random() * 100) + 1} Main St`,
-            wifi: wifiOptions[Math.floor(Math.random() * wifiOptions.length)],
-            power: powerOptions[Math.floor(Math.random() * powerOptions.length)],
-            hours: hours[Math.floor(Math.random() * hours.length)],
-            source: source
-          };
-          
-          // Check if a cafe with similar name and location already exists
-          const isDuplicate = allCafes.some(c => 
-            Math.abs(c.lat - cafeObj.lat) < 0.0005 && 
-            Math.abs(c.lng - cafeObj.lng) < 0.0005
-          );
-          
-          if (!isDuplicate) {
-            allCafes.push(cafeObj);
-            addCafeMarker(cafeObj);
-          }
-        }
-      }
-      
-      // Add marker clustering for better performance with many markers
-      function addMarkerClustering() {
-        // Create marker cluster group
-        const markers = L.markerClusterGroup({
-          showCoverageOnHover: false,
-          maxClusterRadius: 50,
-          iconCreateFunction: function(cluster) {
-            return L.divIcon({
-              html: `<div style="background-color: #8c67ff; color: white; width: 40px; height: 40px; 
-                     border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-                     box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${cluster.getChildCount()}</div>`,
-              className: '',
-              iconSize: [40, 40]
-            });
-          }
-        });
-        
-        // Add all markers to the cluster
-        cafeMarkers.forEach(marker => {
-          map.removeLayer(marker);
-          markers.addLayer(marker);
-        });
-        
-        // Add the cluster to the map
-        map.addLayer(markers);
-        markerCluster = markers;
-      }
-      
-      // Add search box to the map
-      function addSearchBox() {
-        const searchControl = L.control({position: 'topleft'});
-        
-        searchControl.onAdd = function() {
-          const div = L.DomUtil.create('div', 'search-control');
-          div.innerHTML = `
-            <div style="background: white; padding: 8px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-              <input type="text" id="map-search" placeholder="Search cafes..." 
-                     style="width: 200px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-            </div>
-          `;
-          return div;
-        };
-        
-        searchControl.addTo(map);
-        
-        // Prevent map interactions when using the search box
-        const searchInput = document.getElementById('map-search');
-        L.DomEvent.disableClickPropagation(searchInput);
-        L.DomEvent.disableScrollPropagation(searchInput);
-        
-        // Add search functionality
-        searchInput.addEventListener('input', function() {
-          const searchText = this.value.toLowerCase();
-          
-          cafeMarkers.forEach((marker, i) => {
-            const cafe = allCafes[i];
-            if (cafe && cafe.name.toLowerCase().includes(searchText)) {
-              marker.setOpacity(1);
-            } else {
-              marker.setOpacity(0.3);
-            }
-          });
-          
-          // Update the dropdown list as well
-          updateCafeList(searchText);
-        });
-      }
-      
-      // Update the cafe list dropdown
-      function updateCafeList(searchText = '') {
-        // Clear existing options
-        cafeList.innerHTML = '';
-        
-        // Sort cafes alphabetically
-        const sortedCafes = [...allCafes].sort((a, b) => a.name.localeCompare(b.name));
-        
-        // Add options to the datalist
-        sortedCafes.forEach(cafe => {
-          if (!searchText || cafe.name.toLowerCase().includes(searchText.toLowerCase())) {
-            const option = document.createElement('option');
-            option.value = cafe.name;
-            option.dataset.lat = cafe.lat;
-            option.dataset.lng = cafe.lng;
-            cafeList.appendChild(option);
-          }
-        });
-        
-        // Add support for selecting a cafe from the dropdown
-        reviewName.addEventListener('input', function() {
-          const selectedCafe = allCafes.find(c => c.name === this.value);
-          if (selectedCafe) {
-            // Center map on selected cafe
-            map.setView([selectedCafe.lat, selectedCafe.lng], 16);
-            
-            // Find and open the marker popup
-            cafeMarkers.forEach(marker => {
-              if (marker.getLatLng().lat === selectedCafe.lat && 
-                  marker.getLatLng().lng === selectedCafe.lng) {
-                marker.openPopup();
-              }
-            });
-          }
-        });
-      }
-      
-      // Handle review submissions
-      function setupReviewFunctionality() {
-        reviewForm.addEventListener('submit', function(e) {
-          e.preventDefault();
-          
-          // Get reviews from local storage
-          const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
-          
-          // Add the new review
-          reviews.push({
-            name: reviewName.value,
-            rating: +document.getElementById('reviewRating').value,
-            text: document.getElementById('reviewText').value,
-            date: new Date().toISOString().split('T')[0]
-          });
-          
-          // Save back to local storage
-          localStorage.setItem('sb-reviews', JSON.stringify(reviews));
-          
-          // Render the updated reviews
-          renderReviews();
-          
-          // Reset the form
-          e.target.reset();
-          
-          // Show confirmation
-          alert('Review added successfully!');
-        });
-      }
-      
-      // Add function to select cafe for review (called from popup)
-      window.selectCafeForReview = function(cafeName) {
-        reviewName.value = cafeName;
-        
-        // Scroll to the review form
-        reviewForm.scrollIntoView({ behavior: 'smooth' });
-        
-        // Focus on the rating dropdown
-        document.getElementById('reviewRating').focus();
-      };
-      
-      // Initialize everything
-      initializeMap();
-      setupReviewFunctionality();
-      renderReviews();
-    }
+    };
     
-    // Render reviews function (improved)
-    function renderReviews() {
-      const reviewsContainer = document.getElementById('cafeReviews');
-      const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+    // Create cluster group
+    const clusters = L.markerClusterGroup(clusterOptions);
+    
+    // Add all markers to the cluster group
+    cafeMarkers.forEach(marker => {
+      map.removeLayer(marker);
+      clusters.addLayer(marker);
+    });
+    
+    // Add the clusters to the map
+    map.addLayer(clusters);
+    markerCluster = clusters;
+  }
+  
+  // Update cafe list for dropdown
+  function updateCafeList(filter = '') {
+    // Clear existing options
+    cafeList.innerHTML = '';
+    
+    // Sort cafes alphabetically
+    const sortedCafes = [...allCafes].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Add filtered cafes to datalist
+    sortedCafes.forEach(cafe => {
+      if (!filter || cafe.name.toLowerCase().includes(filter.toLowerCase())) {
+        const option = document.createElement('option');
+        option.value = cafe.name;
+        cafeList.appendChild(option);
+      }
+    });
+  }
+  
+  // Set up review functionality
+  function setupReviewForm() {
+    // Handle form submission
+    reviewForm.addEventListener('submit', function(e) {
+      e.preventDefault();
       
-      // Clear existing reviews
-      reviewsContainer.innerHTML = '';
+      // Get form values
+      const name = reviewName.value;
+      const rating = document.getElementById('reviewRating').value;
+      const category = document.getElementById('reviewCategory').value;
+      const text = document.getElementById('reviewText').value;
       
-      if (reviews.length === 0) {
-        // Show empty state
-        reviewsContainer.innerHTML = `
-          <div class="card" style="text-align: center; padding: 2rem;">
-            <h3 style="margin-bottom: 1rem; color: var(--txt-2);">No Reviews Yet</h3>
-            <p>Visit a café and add your first review!</p>
-          </div>
-        `;
+      // Validate
+      if (!name || !rating || !category || !text) {
+        alert('Please fill in all fields');
         return;
       }
       
-      // Group reviews by cafe
-      const reviewsByPlace = {};
-      reviews.forEach(review => {
-        if (!reviewsByPlace[review.name]) {
-          reviewsByPlace[review.name] = [];
-        }
-        reviewsByPlace[review.name].push(review);
+      // Get existing reviews
+      const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+      
+      // Add new review
+      reviews.push({
+        name: name,
+        rating: parseInt(rating),
+        category: category,
+        text: text,
+        date: new Date().toISOString().split('T')[0]
       });
       
-      // Calculate average rating for each cafe
-      Object.keys(reviewsByPlace).forEach(cafeName => {
-        const cafeReviews = reviewsByPlace[cafeName];
-        const averageRating = cafeReviews.reduce((sum, r) => sum + r.rating, 0) / cafeReviews.length;
+      // Save to localStorage
+      localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+      
+      // Reset form
+      this.reset();
+      
+      // Show success message
+      const successMsg = document.createElement('div');
+      successMsg.style.cssText = 'background:#4CAF50;color:white;padding:10px;border-radius:4px;margin-top:10px;';
+      successMsg.textContent = 'Review added successfully!';
+      this.appendChild(successMsg);
+      
+      // Remove message after 3 seconds
+      setTimeout(() => successMsg.remove(), 3000);
+      
+      // Update reviews display
+      renderReviews();
+    });
+    
+    // Handle cafe selection in the form
+    reviewName.addEventListener('input', function() {
+      const selectedCafe = allCafes.find(c => c.name === this.value);
+      if (selectedCafe) {
+        // Pan to the cafe location
+        map.panTo([selectedCafe.lat, selectedCafe.lng]);
         
-        // Create a card for each cafe
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.style.marginBottom = '1rem';
+        // Find and open the marker popup
+        cafeMarkers.forEach((marker, index) => {
+          const cafe = allCafes[index];
+          if (cafe && cafe.name === selectedCafe.name) {
+            map.once('moveend', () => {
+              marker.openPopup();
+            });
+          }
+        });
+      }
+    });
+  }
+  
+  // Function to select a cafe for review (called from marker popup)
+  window.selectCafeForReview = function(cafeName) {
+    // Set the cafe name in the form
+    reviewName.value = cafeName;
+    
+    // Scroll to review form
+    reviewForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Focus on rating dropdown
+    setTimeout(() => {
+      document.getElementById('reviewRating').focus();
+    }, 500);
+  };
+  
+  // Render reviews with improved styling
+  function renderReviews() {
+    const reviewsContainer = document.getElementById('cafeReviews');
+    if (!reviewsContainer) return;
+    
+    // Get reviews from localStorage
+    const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+    
+    // Clear container
+    reviewsContainer.innerHTML = '';
+    
+    // Check if we have reviews
+    if (reviews.length === 0) {
+      reviewsContainer.innerHTML = `
+        <div class="card" style="text-align:center;padding:2rem;">
+          <h3 style="margin-bottom:1rem;color:var(--txt-2);">No Reviews Yet</h3>
+          <p>Share your experience at your favorite study spots!</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // Group reviews by cafe name
+    const reviewsByPlace = {};
+    reviews.forEach(review => {
+      if (!reviewsByPlace[review.name]) {
+        reviewsByPlace[review.name] = [];
+      }
+      reviewsByPlace[review.name].push(review);
+    });
+    
+    // Create a grid for reviews
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:1.5rem;';
+    reviewsContainer.appendChild(grid);
+    
+    // Add cards for each cafe
+    Object.keys(reviewsByPlace).sort().forEach(cafeName => {
+      const cafeReviews = reviewsByPlace[cafeName];
+      
+      // Calculate average rating
+      const avgRating = cafeReviews.reduce((sum, r) => sum + r.rating, 0) / cafeReviews.length;
+      
+      // Create card
+      const card = document.createElement('div');
+      card.className = 'card';
+      
+      // Card header
+      const header = document.createElement('div');
+      header.style.cssText = 'margin-bottom:0.8rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.8rem;';
+      
+      // Cafe name and rating
+      header.innerHTML = `
+        <h3 style="margin:0 0 0.5rem;font-size:1.2rem;">${cafeName}</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="color:var(--ac-warn);font-size:1.1rem;">
+            ${Array(Math.round(avgRating)).fill('★').join('')}${Array(5-Math.round(avgRating)).fill('☆').join('')}
+          </div>
+          <span style="color:var(--txt-2);font-size:0.8rem;">${cafeReviews.length} review${cafeReviews.length > 1 ? 's' : ''}</span>
+        </div>
+      `;
+      card.appendChild(header);
+      
+      // Reviews
+      const reviewsList = document.createElement('div');
+      reviewsList.style.cssText = 'max-height:300px;overflow-y:auto;padding-right:0.5rem;';
+      
+      // Add each review
+      cafeReviews.forEach((review, i) => {
+        const reviewItem = document.createElement('div');
+        reviewItem.style.cssText = `margin-bottom:${i < cafeReviews.length-1 ? '1rem' : '0'};padding-bottom:${i < cafeReviews.length-1 ? '1rem' : '0'};${i < cafeReviews.length-1 ? 'border-bottom:1px solid rgba(255,255,255,0.05);' : ''}`;
         
-        // Generate review HTML
-        card.innerHTML = `
-          <h3>${cafeName}</h3>
-          <div style="color: var(--ac-warn); margin-bottom: 0.5rem; font-size: 1.2rem;">
-            ${'★'.repeat(Math.round(averageRating))}${'☆'.repeat(5 - Math.round(averageRating))}
-            <span style="font-size: 0.8rem; color: var(--txt-2);">(${cafeReviews.length} review${cafeReviews.length > 1 ? 's' : ''})</span>
+        reviewItem.innerHTML = `
+          <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+            <div style="color:var(--ac-warn);">${Array(review.rating).fill('★').join('')}${Array(5-review.rating).fill('☆').join('')}</div>
+            <div style="color:var(--txt-2);font-size:0.8rem;">${review.date || 'No date'}</div>
           </div>
-          <div class="reviews-list">
-            ${cafeReviews.map((review, i) => `
-              <div class="review" style="margin-bottom: ${i === cafeReviews.length - 1 ? '0' : '1rem'}; position: relative;">
-                <div style="color: var(--ac-warn);">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}</div>
-                <p style="margin: 0.3rem 0;">${review.text}</p>
-                <small style="color: var(--txt-2);">${review.date || 'No date'}</small>
-                <button data-cafe="${cafeName}" data-index="${i}" class="btn btn-small btn-secondary delete-review" style="position: absolute; top: 0; right: 0;">×</button>
-              </div>
-            `).join('')}
-          </div>
+          <p style="margin:0;font-size:0.9rem;">${review.text}</p>
+          ${review.category ? `<span style="display:inline-block;background:rgba(140,103,255,0.2);color:var(--txt-1);font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-top:0.5rem;">Best for: ${review.category}</span>` : ''}
+          <button data-cafe="${cafeName}" data-index="${i}" class="btn btn-small btn-secondary delete-review" style="position:absolute;top:10px;right:10px;padding:2px 6px;font-size:0.8rem;">×</button>
         `;
         
-        reviewsContainer.appendChild(card);
+        reviewsList.appendChild(reviewItem);
       });
       
-      // Add event listeners to delete buttons
-      reviewsContainer.querySelectorAll('.delete-review').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const cafeName = this.dataset.cafe;
-          const reviewIndex = parseInt(this.dataset.index);
+      card.appendChild(reviewsList);
+      grid.appendChild(card);
+    });
+    
+    // Add event listeners to delete buttons
+    reviewsContainer.querySelectorAll('.delete-review').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const cafeName = this.dataset.cafe;
+        const reviewIndex = parseInt(this.dataset.index);
+        
+        // Find all reviews for this cafe
+        const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+        const cafeReviews = reviews.filter(r => r.name === cafeName);
+        
+        if (reviewIndex >= 0 && reviewIndex < cafeReviews.length) {
+          // Find the global index
+          const reviewToDelete = cafeReviews[reviewIndex];
+          const globalIndex = reviews.findIndex(r => 
+            r.name === reviewToDelete.name && 
+            r.text === reviewToDelete.text && 
+            r.date === reviewToDelete.date
+          );
           
-          // Find the index in the original array
-          const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
-          
-          // Count to find the correct review in the original array
-          let count = 0;
-          let globalIndex = -1;
-          
-          for (let i = 0; i < reviews.length; i++) {
-            if (reviews[i].name === cafeName) {
-              if (count === reviewIndex) {
-                globalIndex = i;
-                break;
-              }
-              count++;
-            }
-          }
-          
-          if (globalIndex >= 0) {
-            // Remove the review
+          if (globalIndex !== -1) {
+            // Remove from array
             reviews.splice(globalIndex, 1);
             
-            // Save to local storage
+            // Save to localStorage
             localStorage.setItem('sb-reviews', JSON.stringify(reviews));
             
             // Re-render
             renderReviews();
           }
-        });
+        }
       });
-    }
+    });
+  }
+  
+  // Initialize components
+  initializeMap();
+  setupReviewForm();
+  renderReviews();
+  
+  // Add resize listener for better map performance
+  let resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (map) map.invalidateSize();
+    }, 200);
+  });
+}
+
+// Add this function to make "selectCafeForReview" globally available
+window.selectCafeForReview = function(cafeName) {
+  const reviewName = document.getElementById('reviewName');
+  const reviewForm = document.getElementById('reviewForm');
+  
+  if (reviewName && reviewForm) {
+    reviewName.value = cafeName;
+    reviewForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      document.getElementById('reviewRating').focus();
+    }, 500);
+  }
+};
+
     // GAMES
     function initGames(){
       const sel=document.getElementById('gameSelect');
