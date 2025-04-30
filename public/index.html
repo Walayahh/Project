@@ -1022,671 +1022,368 @@ button:focus, input:focus, select:focus, textarea:focus {
   </div>
 
   <script>
- /* StudyBuddy main script – v1.0.1 (all features consolidated & bug‑fixed)
-   ‑‑ paste this file after the <body> tag or bundle it as /assets/js/studybuddy.js ‑‑
-*/
+// studybuddy.js – single‑bundle runtime (2025‑05‑01)
+// ------------------------------------------------------------
+// Everything StudyBuddy needs lives here.  Drop ONE <script>
+// tag that points to this file at the very end of <body>.
+// ------------------------------------------------------------
 
+// studybuddy.js – 2025-05-01
+// ------------------------------------------------------------
+// One drop-in <script> gives you toasts, map, café reviews…
+// ------------------------------------------------------------
 (() => {
-  'use strict';
+  "use strict";
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // GLOBALS & CONSTANTS
-  // ────────────────────────────────────────────────────────────────────────────
-  const VERSION = '1.0.1';
-  let leafletMap = null;   // exposed so resize can invalidate size later
+  //------------------------------------------------------------------
+  // 🔧  SMALL UTILS
+  //------------------------------------------------------------------
+  const $  = (sel, ctx = document) => ctx.querySelector(sel);
+  const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
 
-  /* Convenience */
-  const qs = id => document.getElementById(id);
+  /* toast --------------------------------------------------------- */
+  const toastRoot = (() => {
+    const box = document.createElement("div");
+    box.id = "toast-root";
+    box.style.cssText =
+      `position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px;pointer-events:none`;
+    document.addEventListener("DOMContentLoaded", () => document.body.append(box));
+    return box;
+  })();
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // APP BOOTSTRAP
-  // ────────────────────────────────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log(`StudyBuddy ${VERSION} initialising…`);
+  function toast(msg, type = "info", ms = 3000) {
+    const el = document.createElement("div");
+    el.className = `sb-toast ${type}`;
+    el.style.cssText =
+      `pointer-events:auto;background:rgba(30,30,30,.92);color:#fff;padding:10px 14px;
+       border-radius:6px;font:14px/1.4 Inter,sans-serif;box-shadow:0 3px 8px rgba(0,0,0,.4);
+       border-left:4px solid var(--ac-1);animation:sb-slide-in .25s ease`;
+    el.textContent = msg;
+    toastRoot.append(el);
+    if (ms) setTimeout(() => el.remove(), ms);
+    return el;
+  }
 
-    initVanta();
-    createToastSystem();
-    initNav();
-    initQuotes();
-    initPomodoro();
-    initTasks();
-    initCafe();
-    initGames();
-    initSessions();
-    initPlanner();
-    initChat();
+  //------------------------------------------------------------------
+  // 📍  MAP & LIVE CAFÉS
+  //------------------------------------------------------------------
+  const MapMod = (() => {
+    const state = {
+      map:     null,
+      pos:     null,
+      radius:  5000,
+      markers: [],
+      circle:  null,
+    };
 
-    setupKeyboardShortcuts();
-    adjustForScreenSize();
-    fixMobileViewport();
-    detectTouchDevice();
-    window.addEventListener('resize', adjustForScreenSize);
+    const TYPES = {
+      cafe:       { icon: "☕", color: "#8c67ff", label: "Café" },
+      library:    { icon: "📚", color: "#4f46e5", label: "Library" },
+      university: { icon: "🎓", color: "#10b981", label: "Campus" },
+      default:    { icon: "📍", color: "#888",    label: "Spot"  }
+    };
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(() => console.log('✓ Service‑worker registered'))
-        .catch(err => console.warn('SW registration failed', err));
+    /* load Leaflet on-demand */
+    async function ensureLeaflet() {
+      if (window.L) return;
+      await Promise.all([
+        new Promise(r => {
+          const css = document.createElement("link");
+          css.rel = "stylesheet";
+          css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          css.onload = r; document.head.append(css);
+        }),
+        new Promise(r => {
+          const js  = document.createElement("script");
+          js.src  = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          js.onload = r; document.head.append(js);
+        })
+      ]);
     }
 
-    console.log('StudyBuddy ready!');
-  });
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // TOAST SYSTEM
-  // ────────────────────────────────────────────────────────────────────────────
-  function createToastSystem () {
-    if (qs('toast-container')) return; // already wired
-
-    const wrap = document.createElement('div');
-    wrap.id = 'toast-container';
-    wrap.style.cssText = `position:fixed;bottom:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:300px;`;
-    document.body.appendChild(wrap);
-
-    const css = document.createElement('style');
-    css.textContent = `
-      @keyframes toastIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-      @keyframes toastOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-      .toast{padding:12px 16px;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);font-size:14px;border-left:4px solid;animation:toastIn .3s ease;position:relative;color:#fff;max-width:300px}
-      .toast.info{background:rgba(52,152,219,.95);border-color:#3498db}
-      .toast.success{background:rgba(46,204,113,.95);border-color:#2ecc71}
-      .toast.error{background:rgba(231,76,60,.95);border-color:#e74c3c}
-      .toast.warning{background:rgba(241,196,15,.95);border-color:#f1c40f}`;
-    document.head.appendChild(css);
-
-    /** global */
-    window.showToast = function (message, type = 'info', duration = 3000) {
-      const t = document.createElement('div');
-      t.className = `toast ${type}`;
-      t.innerHTML = `${message}<span style="position:absolute;top:8px;right:8px;cursor:pointer;font-weight:bold;">×</span>`;
-      t.querySelector('span').onclick = close;
-      wrap.appendChild(t);
-
-      if (duration > 0) setTimeout(close, duration);
-
-      function close () {
-        t.style.animation = 'toastOut .3s ease forwards';
-        setTimeout(() => t.remove(), 300);
-      }
-      return t;
-    };
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // VANTA BACKGROUND
-  // ────────────────────────────────────────────────────────────────────────────
-  function initVanta () {
-    if (window.VANTA && window.VANTA.DOTS) {
-      window.VANTA.DOTS({
-        el: '#background',
-        mouseControls: true,
-        touchControls: true,
-        minHeight: 200,
-        minWidth: 200,
-        scale: 1,
-        scaleMobile: 1,
-        color: 0x8c67ff,
-        color2: 0x4f46e5,
-        backgroundColor: 0x121212,
-        size: 3,
-        spacing: 25,
-        showLines: false
-      });
-    }
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // NAVIGATION (tabs)
-  // ────────────────────────────────────────────────────────────────────────────
-  function initNav () {
-    document.querySelectorAll('nav button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelector('nav button.active').classList.remove('active');
-        btn.classList.add('active');
-        document.querySelector('section.active').classList.remove('active');
-        qs(btn.dataset.target).classList.add('active');
-      });
-    });
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // MOTIVATIONAL QUOTES
-  // ────────────────────────────────────────────────────────────────────────────
-  function initQuotes () {
-    const QUOTES = [
-      'Start where you are.', 'Progress over perfection.', 'One step at a time.', 'Dream, believe, do.',
-      'Focus and win.', 'Every day is a second chance.', 'Small progress is progress.', 'Stay positive.',
-      'Believe you can.', 'Do it now.', 'Keep pushing.', 'Consistency is key.', 'Success is a journey.',
-      'You got this.', 'Make today count.'
-    ];
-
-    const container = qs('quotes');
-    const render = () => {
-      container.innerHTML = '';
-      QUOTES.sort(() => 0.5 - Math.random()).slice(0, 3).forEach(q => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.textContent = `"${q}"`;
-        container.append(div);
-      });
-    };
-
-    render();
-    qs('refreshQuotes').onclick = render;
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // POMODORO TIMER
-  // ────────────────────────────────────────────────────────────────────────────
-  function initPomodoro () {
-    let seconds = 25 * 60;
-    let timer = null;
-    const display = qs('timerDisplay');
-    const startBtn = qs('startTimer');
-    const pauseBtn = qs('pauseTimer');
-    const resetBtn = qs('resetTimer');
-
-    const update = () => {
-      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-      const s = String(seconds % 60).padStart(2, '0');
-      display.textContent = `${m}:${s}`;
-      document.title = `(${m}:${s}) StudyBuddy`;
-    };
-    update();
-
-    startBtn.onclick = () => {
-      if (timer) return;
-      timer = setInterval(() => {
-        if (seconds > 0) {
-          seconds--; update();
-        } else {
-          clearInterval(timer); timer = null;
-          window.confetti && window.confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
-          showToast('Pomodoro finished! Take a break.', 'success');
-          document.title = 'StudyBuddy';
-        }
-      }, 1000);
-    };
-
-    pauseBtn.onclick = () => { clearInterval(timer); timer = null; };
-    resetBtn.onclick = () => { clearInterval(timer); timer = null; seconds = 25 * 60; update(); };
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // TASK KANBAN BOARD
-  // ────────────────────────────────────────────────────────────────────────────
-  function initTasks () {
-    const LS_KEY = 'sb-tasks';
-    const board = qs('tasksBoard');
-    const form = qs('newTaskForm');
-    const input = qs('newTaskInput');
-
-    const blank = () => ({ todo: [], inprogress: [], completed: [] });
-    const load = () => {
-      try {
-        const d = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-        if (Array.isArray(d)) return { todo: d, inprogress: [], completed: [] }; // migrate
-        return d && typeof d === 'object' ? d : blank();
-      } catch { return blank(); }
-    };
-    const save = data => localStorage.setItem(LS_KEY, JSON.stringify(data));
-
-    const render = () => {
-      const data = load();
-      ['todo', 'inprogress', 'completed'].forEach(status => {
-        const col = document.querySelector(`.column[data-status="${status}"]`);
-        const title = col.querySelector('h3').textContent;
-        col.innerHTML = `<h3>${title}</h3>`;
-        data[status].forEach((txt, i) => {
-          const div = document.createElement('div');
-          div.className = 'task';
-          div.innerHTML = `
-            <span>${txt}</span>
-            <div class="task-buttons">
-              ${status === 'todo' ? `<button class="btn btn-small btn-primary" data-act="start" data-idx="${i}">Start</button>` : ''}
-              ${status === 'inprogress' ? `<button class="btn btn-small btn-primary" data-act="complete" data-idx="${i}">Complete</button>` : ''}
-              <button class="btn btn-small btn-secondary" data-act="delete" data-status="${status}" data-idx="${i}">×</button>
-            </div>`;
-          col.append(div);
-        });
-      });
-    };
-
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const val = input.value.trim();
-      if (!val) return;
-      const data = load();
-      data.todo.push(val); save(data);
-      input.value = ''; render();
-    });
-
-    board.addEventListener('click', e => {
-      const btn = e.target.closest('button[data-act]');
-      if (!btn) return;
-      const action = btn.dataset.act;
-      const idx = +btn.dataset.idx;
-      const data = load();
-
-      if (action === 'delete') data[btn.dataset.status].splice(idx, 1);
-      if (action === 'start') data.inprogress.push(data.todo.splice(idx, 1)[0]);
-      if (action === 'complete') {
-        data.completed.push(data.inprogress.splice(idx, 1)[0]);
-        window.confetti && window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        qs('celebrationPopup').style.display = 'block';
-        setTimeout(() => qs('celebrationPopup').style.display = 'none', 3000);
-      }
-      save(data); render();
-    });
-
-    qs('closeCelebration').onclick = () => qs('celebrationPopup').style.display = 'none';
-    render();
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // STUDY CAFÉ MAP + REVIEWS (Leaflet + OpenStreetMap)
-  // ────────────────────────────────────────────────────────────────────────────
-  function initCafe () {
-    const mapEl = qs('map');
-    if (!mapEl) return;
-
-    let cafeMarkers = [];
-    const cafeList = qs('cafeList');
-    const reviewForm = qs('reviewForm');
-    let allCafes = [];
-
-    /* dynamic leaflet loader */
-    const loadLeaflet = () => new Promise((resolve, reject) => {
-      if (window.L) { resolve(); return; }
-      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(css);
-      const js = document.createElement('script'); js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      js.onload = resolve; js.onerror = reject; document.head.appendChild(js);
-    });
-
-    const initMap = (lat, lng) => {
-      leafletMap = L.map(mapEl, { center: [lat, lng], zoom: 14 });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(leafletMap);
-      L.marker([lat, lng]).addTo(leafletMap).bindPopup('Your location');
-      L.circle([lat, lng], { radius: 5000, color: '#8c67ff', fillColor: '#8c67ff', fillOpacity: .05 }).addTo(leafletMap);
-      fetchCafes(lat, lng, 5000);
-    };
-
-    const fetchCafes = (lat, lng, radius) => {
-      const query = `[out:json][timeout:15];(node["amenity"="cafe"](around:${radius},${lat},${lng});node["amenity"="library"](around:${radius},${lat},${lng});node["shop"="coffee"](around:${radius},${lat},${lng}));out body;`;
-      fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(query)
-      })
-        .then(r => r.json())
-        .then(j => processCafes(j.elements))
-        .catch(err => {
-          console.warn('Overpass error', err);
-          showToast('Couldn\'t fetch cafés. Showing sample data.', 'warning');
-          processCafes([
-            { lat: lat + 0.005, lon: lng + 0.005, tags: { name: 'Study Café', amenity: 'cafe' } },
-            { lat: lat - 0.004, lon: lng + 0.006, tags: { name: 'Library Corner', amenity: 'library' } }
-          ]);
-        });
-    };
-
-    const ico = (emoji, bg) => L.divIcon({ html: `<div style="background:${bg};color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">${emoji}</div>`, className: '' });
-
-    const processCafes = nodes => {
-      clearMarkers();
-      allCafes = [];
-      nodes.forEach(n => {
-        const t = n.tags.amenity === 'library' ? 'library' : 'cafe';
-        const info = t === 'library' ? { e: '📚', c: '#4f46e5', lbl: 'Library' } : { e: '☕', c: '#8c67ff', lbl: 'Café' };
-        const name = n.tags.name || `${info.lbl} #${n.id.toString().slice(-4)}`;
-        allCafes.push({ name });
-        const m = L.marker([n.lat, n.lon], { icon: ico(info.e, info.c) }).addTo(leafletMap);
-        m.bindPopup(`<strong>${name}</strong><br><button onclick="selectCafeForReview('${name.replace(/'/g, '\\')}")" style="margin-top:6px;background:${info.c};color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;">Add Review</button>`);
-        cafeMarkers.push(m);
-      });
-      updateCafeList();
-    };
-
-    const clearMarkers = () => { cafeMarkers.forEach(m => leafletMap.removeLayer(m)); cafeMarkers = []; };
-
-    window.selectCafeForReview = name => {
-      const input = qs('reviewName'); if (input) { input.value = name; reviewForm.scrollIntoView({ behavior: 'smooth' }); }
-      showToast(`Selected ${name} for review`, 'info', 2000);
-    };
-
-    /* Review CRUD */
-    const LS_REV = 'sb-reviews';
-    const getReviews = () => { try { return JSON.parse(localStorage.getItem(LS_REV) || '[]'); } catch { return []; } };
-    const saveReviews = arr => localStorage.setItem(LS_REV, JSON.stringify(arr));
-
-    const renderReviews = () => {
-      const container = qs('cafeReviews');
-      if (!container) return;
-      const reviews = getReviews();
-      container.innerHTML = '';
-      if (!reviews.length) { container.innerHTML = '<div class="card" style="padding:2rem;text-align:center;">No reviews yet.</div>'; return; }
-      const by = {};
-      reviews.forEach(r => (by[r.name] = by[r.name] || []).push(r));
-      Object.keys(by).sort().forEach(cafe => {
-        const arr = by[cafe];
-        const avg = arr.reduce((s, r) => s + r.rating, 0) / arr.length;
-        const card = document.createElement('div'); card.className = 'card cafe-review-card';
-        card.innerHTML = `<div class="review-header"><h3 style="margin:0">${cafe}</h3><div>${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))}</div></div>`;
-        arr.forEach((r, i) => {
-          const item = document.createElement('div'); item.style.cssText = 'border-top:1px solid rgba(255,255,255,.05);margin-top:6px;padding-top:6px';
-          item.innerHTML = `
-            <div style="color:#f2c94c">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
-            <p style="margin:4px 0">${r.text}</p>
-            <small>${r.date}</small>
-            <button class="delete-review btn btn-small btn-secondary" data-cafe="${cafe}" data-idx="${i}" style="float:right">×</button>`;
-          card.appendChild(item);
-        });
-        container.appendChild(card);
-      });
-      container.querySelectorAll('.delete-review').forEach(btn => {
-        btn.onclick = () => {
-          const cafe = btn.dataset.cafe;
-          const idx = +btn.dataset.idx;
-          const rev = getReviews();
-          const filtered = rev.filter(r => !(r.name === cafe && by[cafe].indexOf(r) === idx));
-          saveReviews(filtered);
-          renderReviews();
-          showToast('Review deleted', 'success');
-        };
-      });
-    };
-
-    if (reviewForm) {
-      reviewForm.addEventListener('submit', e => {
-        e.preventDefault();
-        const name = qs('reviewName').value.trim();
-        const rating = +qs('reviewRating').value;
-        const category = qs('reviewCategory').value;
-        const text = qs('reviewText').value.trim();
-        if (!name || !rating || !category || !text) { showToast('Fill all review fields', 'error'); return; }
-        const rev = getReviews();
-        rev.push({ name, rating, category, text, date: new Date().toISOString().split('T')[0] });
-        saveReviews(rev);
-        reviewForm.reset();
-        renderReviews();
-        showToast('Review saved!', 'success');
-      });
-    }
-
-    const updateCafeList = () => {
-      cafeList.innerHTML = '';
-      allCafes.sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
-        const op = document.createElement('option'); op.value = c.name; cafeList.appendChild(op);
-      });
-    };
-
-    loadLeaflet().then(() => {
-      navigator.geolocation.getCurrentPosition(
-        pos => initMap(pos.coords.latitude, pos.coords.longitude),
-        () => initMap(25.276987, 55.296249),
-        { timeout: 5000 });
-    });
-
-    renderReviews();
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // GAME IFRAME SELECTOR
-  // ────────────────────────────────────────────────────────────────────────────
-  function initGames () {
-    const select = qs('gameSelect');
-    const frame = qs('gameFrame');
-    if (!select || !frame) return;
-
-    const GAMES = [
-      ['Wordle Clone', 'https://wordlegame.org/'],
-      ['Hangman', 'https://hangmanwordgame.com/'],
-      ['Flappy Bird', 'https://flappybird.io/'],
-      ['Minesweeper', 'https://kamoroso94.github.io/minesweeper/'],
-      ['Sudoku', 'https://sudoku.com/'],
-      ['Connect Four', 'https://torikul007.github.io/Connect_Four/']
-    ];
-
-    select.innerHTML = '';
-    GAMES.forEach(([label, url]) => {
-      const op = document.createElement('option'); op.value = url; op.textContent = label; select.appendChild(op);
-    });
-    select.onchange = () => { frame.src = select.value; };
-    select.selectedIndex = 0; select.dispatchEvent(new Event('change'));
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // STUDY SESSIONS LIST
-  // ────────────────────────────────────────────────────────────────────────────
-  function initSessions () {
-    const LS = 'sb-sessions';
-    const get = () => { try { return JSON.parse(localStorage.getItem(LS) || '[]'); } catch { return []; } };
-    const save = arr => localStorage.setItem(LS, JSON.stringify(arr));
-    const list = qs('sessionList');
-    const form = qs('sessionForm');
-
-    const render = () => {
-      const arr = get();
-      list.innerHTML = '';
-      if (!arr.length) { list.innerHTML = '<li class="card">No sessions yet.</li>'; return; }
-      arr.sort((a, b) => new Date(b.date) - new Date(a.date));
-      arr.forEach((s, i) => {
-        const li = document.createElement('li'); li.className = 'card'; li.style.marginBottom = '.6rem';
-        li.innerHTML = `<strong>${s.topic}</strong> ${s.date} — ${s.duration} min <button class="btn btn-small btn-secondary" data-idx="${i}">Delete</button>`;
-        li.querySelector('button').onclick = () => { const d = get(); d.splice(i, 1); save(d); render(); showToast('Session deleted', 'info'); };
-        list.appendChild(li);
-      });
-    };
-
-    if (form) {
-      form.addEventListener('submit', e => {
-        e.preventDefault();
-        const topic = qs('sessionTopic').value.trim();
-        const date = qs('sessionDate').value;
-        const duration = +qs('sessionDuration').value;
-        if (!topic || !date || isNaN(duration)) { showToast('Fill all session fields', 'error'); return; }
-        const data = get(); data.push({ topic, date, duration }); save(data); render(); form.reset(); showToast('Session added', 'success');
-      });
-    }
-
-    render();
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // STUDY PLANNER & STUDY PLAN GENERATOR
-  // ────────────────────────────────────────────────────────────────────────────
-  function initPlanner () {
-    const LS = 'sb-plans';
-    const get = () => { try { return JSON.parse(localStorage.getItem(LS) || '[]'); } catch { return []; } };
-    const save = a => localStorage.setItem(LS, JSON.stringify(a));
-
-    const list = qs('planList');
-    const form = qs('plannerForm');
-    const generateBtn = qs('planStudy');
-    const advice = qs('plannerAdvice');
-
-    const categories = ['Homework', 'Reading', 'Project', 'Review', 'Exam', 'Essay', 'Presentation', 'Research', 'Lab', 'Other'];
-    const catSelect = qs('planCat');
-    if (catSelect && catSelect.options.length <= 1) {
-      catSelect.innerHTML = '<option value="">Category…</option>';
-      categories.forEach(c => { const op = document.createElement('option'); op.value = c; op.textContent = c; catSelect.appendChild(op); });
-    }
-
-    const render = () => {
-      const arr = get();
-      list.innerHTML = '';
-      if (!arr.length) { list.innerHTML = '<div class="card" style="text-align:center;padding:1rem;">No study plans yet.</div>'; return; }
-      arr.sort((a, b) => new Date(a.date) - new Date(b.date));
-      const em = { Homework: '📝', Reading: '📚', Project: '🛠️', Review: '🔍', Exam: '📊', Essay: '✍️', Presentation: '🎯', Research: '🔬', Lab: '🧪', Other: '📌' };
-      arr.forEach((p, i) => {
-        const card = document.createElement('div'); card.className = 'card'; card.style.position = 'relative';
-        const when = new Date(p.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-        card.innerHTML = `
-          <h4 style="margin-bottom:6px"><span style="font-size:1.4em">${em[p.category] || '📌'}</span> ${p.title}</h4>
-          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><small style="background:rgba(140,103,255,.2);padding:2px 8px;border-radius:12px">${p.category}</small><small style="color:var(--txt-2)">📅 ${when}</small></div>
-          <p>${p.desc || ''}</p>
-          <button class="delete-plan btn btn-small btn-secondary" data-idx="${i}" style="position:absolute;top:8px;right:8px">×</button>`;
-        card.querySelector('button').onclick = () => { const d = get(); d.splice(i, 1); save(d); render(); showToast('Plan deleted', 'success'); };
-        list.appendChild(card);
-      });
-    };
-
-    if (form) {
-      form.addEventListener('submit', e => {
-        e.preventDefault();
-        const title = qs('planTitle').value.trim();
-        const category = qs('planCat').value;
-        const desc = qs('planDesc').value.trim();
-        const date = qs('planDate').value;
-        if (!title || !category || !date) { showToast('Fill required fields', 'error'); return; }
-        const data = get(); data.push({ title, category, desc, date }); save(data); form.reset(); render(); showToast('Plan added', 'success');
-      });
-    }
-
-    generateBtn.onclick = () => {
-      const tasks = get();
-      if (!tasks.length) { advice.innerHTML = '<p style="text-align:center">Please add tasks first.</p>'; return; }
-      advice.innerHTML = '<p style="text-align:center;padding:20px;">Generating plan…</p>';
-      setTimeout(() => {
-        const today = new Date();
-        tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        const md = [`# Your Personalized Study Plan`, `Today is ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`];
-        tasks.forEach(t => {
-          const due = new Date(t.date);
-          const diff = Math.ceil((due - today) / 86400000);
-          const when = diff <= 0 ? 'Today' : diff === 1 ? 'Tomorrow' : `In ${diff} days`;
-          md.push(`## ${when}`);
-          md.push(`### ${t.title} (${t.category})`);
-          md.push(`- Due date: ${due.toLocaleDateString()}`);
-          if (t.desc) md.push(`- Description: ${t.desc}`);
-          md.push(`- Study tip: ${t.category === 'Reading' ? 'Break reading into chunks.' : 'Use 25‑min focus sessions.'}`);
-        });
-        md.push('## General Tips', '- Study in 25‑30 min blocks', '- Stay hydrated');
-
-        const html = markdownToHtml(md.join('\n'));
-        advice.innerHTML = html;
-        attachDownload(html.replace(/<[^>]+>/g, ''));
-        showToast('Study plan generated', 'success');
-      }, 600);
-    };
-
-    const markdownToHtml = md => {
-      return md.split('\n').map(line => {
-        if (line.startsWith('# ')) return `<h1>${line.slice(2)}</h1>`;
-        if (line.startsWith('## ')) return `<h2>${line.slice(3)}</h2>`;
-        if (line.startsWith('### ')) return `<h3>${line.slice(4)}</h3>`;
-        if (line.startsWith('- ')) return `<li>${line.slice(2)}</li>`;
-        return `<p>${line}</p>`;
-      }).join('');
-    };
-
-    const attachDownload = text => {
-      let btn = qs('downloadPlan');
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.id = 'downloadPlan';
-        btn.className = 'btn btn-primary';
-        btn.textContent = '📥 Download Study Plan';
-        generateBtn.insertAdjacentElement('afterend', btn);
-      }
-      btn.onclick = () => {
-        const blob = new Blob([text], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'StudyBuddy_Plan.txt';
-        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-        showToast('Study plan downloaded', 'success');
+    /* slider for radius ------------------------------------------- */
+    function buildSlider() {
+      const ctl = L.control({ position: "topright" });
+      ctl.onAdd = () => {
+        const div = L.DomUtil.create("div");
+        div.style.cssText =
+          "background:rgba(18,18,18,.85);padding:8px 10px;border-radius:6px;font:12px/1 Inter;color:#fff;";
+        div.innerHTML =
+          `Range <input id="sb-range" type="range" min="1000" max="20000" step="1000"
+                 value="${state.radius}" style="width:120px;vertical-align:middle;margin:0 6px;">
+           <span id="sb-range-v">${state.radius / 1000} km</span>`;
+        const inp = div.querySelector("#sb-range"),
+              out = div.querySelector("#sb-range-v");
+        L.DomEvent.disableClickPropagation(div);
+        inp.oninput  = () => (out.textContent = (inp.value / 1000).toFixed(1) + " km");
+        inp.onchange = () => { state.radius = +inp.value; drawCircle(); loadCafes(); };
+        return div;
       };
+      ctl.addTo(state.map);
+    }
+
+    /* keep selection circle in sync ------------------------------- */
+    function drawCircle() {
+      const { pos, radius } = state;
+      if (!pos) return;
+      if (state.circle) {
+        state.circle.setLatLng(pos).setRadius(radius);
+      } else {
+        state.circle = L.circle(pos, {
+          radius,
+          color: "#8c67ff",
+          weight: 1,
+          fillOpacity: 0.05
+        }).addTo(state.map);
+      }
+    }
+
+    /* helpers ------------------------------------------------------ */
+    const clearMarkers = () => state.markers.splice(0).forEach(m => m.remove());
+
+    const makeMarker = place => {
+      const t = TYPES[place.type] || TYPES.default;
+      return L.marker([place.lat, place.lon], {
+        icon: L.divIcon({
+          html:
+            `<div style="background:${t.color};color:white;width:26px;height:26px;border-radius:50%;
+                     display:flex;align-items:center;justify-content:center;font-size:14px;">${t.icon}</div>`,
+          className: "",
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        })
+      }).bindPopup(
+        `<strong style="color:${t.color}">${place.name}</strong><br>
+         <small>${place.addr || "No address"}</small><br><br>
+         <button class="sb-add-review" data-name="${place.name.replace(/"/g, "&quot;")}">
+           Add review
+         </button>`
+      );
     };
 
-    render();
-  }
+    /* get Overpass data ------------------------------------------- */
+    async function loadCafes() {
+      const { pos, radius } = state;
+      if (!pos) return;
+      toast(`Searching ${ (radius / 1000).toFixed(1) } km ...`, "info", 1500);
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // MINI CHATBOT (client‑side fallback)
-  // ────────────────────────────────────────────────────────────────────────────
-  function initChat () {
-    const toggle = qs('chatToggle');
-    const widget = qs('chatWidget');
-    const closeBtn = qs('chatClose');
-    const body = qs('chatBody');
-    const form = qs('chatInput');
-
-    const addMsg = (cls, txt) => {
-      const row = document.createElement('div'); row.className = `row ${cls}`; row.innerHTML = `<p>${txt}</p>`; body.appendChild(row); body.scrollTop = body.scrollHeight;
-    };
-
-    toggle.onclick = () => widget.classList.toggle('open');
-    closeBtn.onclick = () => widget.classList.remove('open');
-
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      const inp = form.querySelector('input');
-      const txt = inp.value.trim(); if (!txt) return;
-      addMsg('me', txt); inp.value = '';
-      addMsg('bot', '…');
+      const query = `
+        [out:json][timeout:25];
+        (
+          node["amenity"~"cafe|library|college|university"](around:${radius},${pos.lat},${pos.lng});
+          node["shop"="coffee"](around:${radius},${pos.lat},${pos.lng});
+        );
+        out body;
+      `;
 
       try {
-        const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: txt }) });
-        const { reply } = await res.json();
-        body.querySelector('.row.bot:last-child p').textContent = reply || defaultReply();
-      } catch {
-        body.querySelector('.row.bot:last-child p').textContent = defaultReply();
+        const res = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "data=" + encodeURIComponent(query),
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const json = await res.json();
+        processOverpass(json);
+      } catch (err) {
+        console.error(err);
+        toast("Overpass error – please try again", "error");
       }
-    });
-
-    const defaultReply = () => {
-      const arr = [
-        'I\'m here to help with your studying.',
-        'Need help organizing your schedule?',
-        'Tip: Use Pomodoro to stay focused.',
-        'Remember to take breaks!',
-        'What topic are you working on?'
-      ];
-      return arr[Math.floor(Math.random() * arr.length)];
-    };
-  }
-
-  // ────────────────────────────────────────────────────────────────────────────
-  // KEYBOARD SHORTCUTS & RESPONSIVE HELPERS
-  // ────────────────────────────────────────────────────────────────────────────
-  function setupKeyboardShortcuts () {
-    document.addEventListener('keydown', e => {
-      if (e.altKey && e.key === 't') qs('startTimer').click();
-      if (e.altKey && e.key === 'n') qs('newTaskInput').focus();
-      if (e.altKey && ['1', '2', '3', '4', '5'].includes(e.key)) {
-        document.querySelectorAll('nav button')[+e.key - 1]?.click();
-      }
-    });
-  }
-
-  function adjustForScreenSize () {
-    const mobile = window.innerWidth < 768;
-    const map = qs('map'); if (map) map.style.height = mobile ? '350px' : '500px';
-    const reviewForm = qs('reviewForm'); if (reviewForm) reviewForm.style.display = mobile ? 'block' : 'grid';
-    leafletMap && setTimeout(() => leafletMap.invalidateSize(), 100);
-  }
-
-  function fixMobileViewport () {
-    if (window.innerWidth < 768) {
-      let vp = document.querySelector('meta[name="viewport"]');
-      if (!vp) { vp = document.createElement('meta'); vp.name = 'viewport'; document.head.appendChild(vp); }
-      vp.content = 'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no';
     }
-  }
 
-  function detectTouchDevice () {
-    if ('ontouchstart' in window || navigator.maxTouchPoints) document.body.classList.add('touch-device');
-  }
+    /* turn Overpass → markers ------------------------------------- */
+    function processOverpass(json) {
+      if (!json.elements?.length) return toast("No study spots found", "warning");
+      clearMarkers();
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // GLOBAL ERROR HANDLER (last‑resort)
-  // ────────────────────────────────────────────────────────────────────────────
-  window.addEventListener('error', e => {
-    if (e.message && (e.message.includes('ResizeObserver loop') || e.message.includes('Script error'))) return;
-    console.error('Global error', e);
-    showToast('An unexpected error occurred.', 'error', 5000);
+      const places = json.elements
+        .filter(el => el.type === "node" && el.tags)
+        .map(el => {
+          const tg = el.tags;
+          let type = "default";
+          if (tg.amenity === "cafe" || tg.shop === "coffee")          type = "cafe";
+          else if (tg.amenity === "library")                          type = "library";
+          else if (["college", "university"].includes(tg.amenity))    type = "university";
+
+          return {
+            lat:  el.lat,
+            lon:  el.lon,
+            type,
+            name: tg.name || TYPES[type].label,
+            addr: [tg["addr:housenumber"], tg["addr:street"], tg["addr:city"]]
+                    .filter(Boolean).join(" "),
+          };
+        });
+
+      places.forEach(p => {
+        const m = makeMarker(p).addTo(state.map);
+        state.markers.push(m);
+      });
+
+      updateCafeDatalist(places);
+      toast(`${places.length} spots found`, "success");
+    }
+
+    /* datalist for review auto-complete --------------------------- */
+    function updateCafeDatalist(places) {
+      const dl = $("#cafeList");
+      if (!dl) return;
+      dl.innerHTML = "";
+      [...new Set(places.map(p => p.name))]
+        .sort()
+        .forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          dl.append(opt);
+        });
+    }
+
+    /* public init -------------------------------------------------- */
+    async function init() {
+      await ensureLeaflet();
+      const mapEl = $("#map");
+      if (!mapEl) return;
+
+      // get user position (fallback: Dubai)
+      const loc = await new Promise(res => {
+        navigator.geolocation.getCurrentPosition(
+          p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+          () => res({ lat: 25.27699, lng: 55.29625 }),
+          { timeout: 4000 }
+        );
+      });
+      state.pos = loc;
+
+      // build map
+      state.map = L.map(mapEl, {
+        center: [loc.lat, loc.lng],
+        zoom: 14,
+        scrollWheelZoom: true,
+        doubleClickZoom: false,
+      });
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        { maxZoom: 19 }
+      ).addTo(state.map);
+      L.marker([loc.lat, loc.lng]).addTo(state.map).bindPopup("You");
+
+      drawCircle();
+      buildSlider();
+      loadCafes();
+
+      // fix jitter when the container resizes
+      new ResizeObserver(() => state.map.invalidateSize()).observe(mapEl);
+    }
+
+    return { init };
+  })();
+
+  //------------------------------------------------------------------
+  // 📝  CAFE REVIEWS (reliable delete)
+  //------------------------------------------------------------------
+  const ReviewMod = (() => {
+    const LS = "sb-reviews";
+    const get  = () => JSON.parse(localStorage.getItem(LS) || "[]");
+    const save = arr => localStorage.setItem(LS, JSON.stringify(arr));
+
+    /* paint to DOM ----------------------------------------------- */
+    function render() {
+      const box = $("#cafeReviews");
+      if (!box) return;
+      const reviews = get();
+      box.innerHTML = "";
+
+      if (!reviews.length) {
+        box.innerHTML =
+          '<div class="card" style="text-align:center;padding:2rem;">No reviews yet.</div>';
+        return;
+      }
+
+      reviews.forEach(r => {
+        const card = document.createElement("div");
+        card.className = "card cafe-review-card";
+        card.innerHTML = `
+          <div class="review-header">
+            <h3>${r.name}</h3>
+            <span>${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span>
+          </div>
+          <p>${r.text}</p>
+          <small>${r.date}</small>
+          <button class="delete-review" data-id="${r.id}">×</button>
+        `;
+        box.append(card);
+      });
+    }
+
+    /* submit & save ---------------------------------------------- */
+    function submit(e) {
+      e.preventDefault();
+      const name  = $("#reviewName").value.trim();
+      const rating= +$("#reviewRating").value;
+      const cat   = $("#reviewCategory").value;
+      const text  = $("#reviewText").value.trim();
+
+      if (!name || !rating || !cat || !text)
+        return toast("Please fill in every field", "error");
+
+      const reviews = get();
+      reviews.push({
+        id:   Date.now().toString(36),
+        name, rating, category: cat, text,
+        date: new Date().toLocaleDateString(),
+      });
+      save(reviews);
+      render();
+      e.target.reset();
+      toast("Review saved", "success");
+    }
+
+    /* delete ------------------------------------------------------ */
+    function del(e) {
+      const btn = e.target.closest(".delete-review");
+      if (!btn) return;
+      const id  = btn.dataset.id;
+      save(get().filter(r => r.id !== id));
+      render();
+      toast("Deleted", "info");
+    }
+
+    /* public hook ------------------------------------------------- */
+    function hook() {
+      $("#reviewForm")?.addEventListener("submit", submit);
+      $("#cafeReviews")?.addEventListener("click", del);
+      render();
+    }
+
+    return { hook };
+  })();
+
+  //------------------------------------------------------------------
+  // ⚡  BOOT
+  //------------------------------------------------------------------
+  document.addEventListener("DOMContentLoaded", () => {
+    MapMod.init();
+    ReviewMod.hook();
+    toast("StudyBuddy ready 🚀", "success", 2500);
   });
 
+  //------------------------------------------------------------------
+  // 🖌️  AUTO-INJECT STYLES
+  //------------------------------------------------------------------
+  const css = document.createElement("style");
+  css.textContent = `
+    @keyframes sb-slide-in{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+    .sb-toast.info    {border-color:#3498db}
+    .sb-toast.success {border-color:#2ecc71}
+    .sb-toast.error   {border-color:#e74c3c}
+    .sb-toast.warning {border-color:#f1c40f}
+    .delete-review {position:absolute;top:6px;right:8px;background:none;border:none;
+                     color:#f2c94c;font-weight:bold;cursor:pointer;font-size:18px;}
+    .delete-review:hover{color:#ff6f91}
+    .sb-add-review{background:#8c67ff;color:#fff;border:none;padding:4px 10px;border-radius:4px;
+                   cursor:pointer;font-size:12px;}
+  `;
+  document.head.append(css);
 })();
 
   </script>
