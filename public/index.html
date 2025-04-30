@@ -585,33 +585,41 @@
     </section>
 
     <!-- Cafés -->
-    <div class="card">
-      <h3>Add Café Review</h3>
-      <form id="reviewForm">
-        <div style="position: relative; grid-column: span 2;">
-          <input id="reviewName" list="cafeList" type="text" placeholder="Choose a cafe or type a name..." required/>
-          <datalist id="cafeList"></datalist>
-        </div>
-        <select id="reviewRating" required>
-          <option value="">Select Rating...</option>
-          <option value="1">★ (Poor)</option>
-          <option value="2">★★ (Fair)</option>
-          <option value="3">★★★ (Good)</option>
-          <option value="4">★★★★ (Very Good)</option>
-          <option value="5">★★★★★ (Excellent)</option>
-        </select>
-        <select id="reviewCategory" required>
-          <option value="">Best For...</option>
-          <option value="studying">Studying</option>
-          <option value="reading">Reading</option>
-          <option value="meetings">Meetings</option>
-          <option value="relaxing">Relaxing</option>
-          <option value="food">Food & Drinks</option>
-        </select>
-        <textarea id="reviewText" rows="3" placeholder="Share your experience... Were the tables good for studying? How was the WiFi? Was it quiet?" required></textarea>
-        <button class="btn btn-primary" type="submit">Save Review</button>
-      </form>
-
+<!-- Cafés -->
+<section id="cafes">
+  <h2 class="section-title">Study Cafés</h2>
+  <div id="map"></div>
+  
+  <div class="card">
+    <h3>Add Café Review</h3>
+    <form id="reviewForm">
+      <div style="position: relative; grid-column: span 2;">
+        <input id="reviewName" list="cafeList" type="text" placeholder="Choose a cafe or type a name..." required/>
+        <datalist id="cafeList"></datalist>
+      </div>
+      <select id="reviewRating" required>
+        <option value="">Select Rating...</option>
+        <option value="1">★ (Poor)</option>
+        <option value="2">★★ (Fair)</option>
+        <option value="3">★★★ (Good)</option>
+        <option value="4">★★★★ (Very Good)</option>
+        <option value="5">★★★★★ (Excellent)</option>
+      </select>
+      <select id="reviewCategory" required>
+        <option value="">Best For...</option>
+        <option value="studying">Studying</option>
+        <option value="reading">Reading</option>
+        <option value="meetings">Meetings</option>
+        <option value="relaxing">Relaxing</option>
+        <option value="food">Food & Drinks</option>
+      </select>
+      <textarea id="reviewText" rows="3" placeholder="Share your experience... Were the tables good for studying? How was the WiFi? Was it quiet?" required></textarea>
+      <button class="btn btn-primary" type="submit">Save Review</button>
+    </form>
+  </div>
+  
+  <div id="cafeReviews"></div>
+</section>
     <!-- Games -->
     <section id="games">
       <h2 class="section-title">Take a Break</h2>
