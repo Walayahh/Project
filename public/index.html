@@ -1341,8 +1341,9 @@ document.addEventListener('DOMContentLoaded', function() {
 // Replace the entire initCafe function with this improved version
 // Enhanced Cafe Map with Real Cafes and Better Performance
 // Fixed Cafe Map Implementation with REAL cafe data only - No simulated cafes
+// DIRECT REPLACEMENT FOR CAFE MAP IMPLEMENTATION
 function initCafe() {
-  console.log("Initializing real cafe map");
+  console.log("Initializing cafe map with direct implementation");
   
   // Cache DOM elements
   const mapContainer = document.getElementById('map');
@@ -1351,56 +1352,45 @@ function initCafe() {
   const reviewName = document.getElementById('reviewName');
   
   // Map globals
-  let map, markerCluster;
-  let cafeMarkers = [];
-  let allCafes = [];
-  let userLocation = null;
+  let map, cafeMarkers = [], allCafes = [];
   
-  // Initialize map with proper error handling
-  function initializeMap() {
-    console.log("Setting up map container");
-    
-    // Make sure map container exists
-    if (!mapContainer) {
-      console.error("Map container not found!");
-      return;
-    }
-    
-    // Clear any existing map to prevent memory leaks
-    if (window.leafletMap) {
-      window.leafletMap.remove();
-      window.leafletMap = null;
-    }
-    
-    // Show loading indicator
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = 'map-loading';
-    loadingDiv.innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:rgba(30,30,30,0.8);padding:15px 25px;border-radius:8px;text-align:center;">Loading map...</div>';
-    mapContainer.appendChild(loadingDiv);
-    
-    // Get user location with better error handling
-    navigator.geolocation.getCurrentPosition(
-      // Success callback
-      position => {
-        userLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        setupMap(userLocation.lat, userLocation.lng);
-      },
-      // Error callback
-      error => {
-        console.warn("Geolocation error:", error);
-        // Default to a central location
-        userLocation = { lat: 40.7128, lng: -74.0060 }; // New York
-        setupMap(userLocation.lat, userLocation.lng);
-      },
-      // Options
-      { timeout: 10000, enableHighAccuracy: false }
-    );
+  // Make sure map container exists
+  if (!mapContainer) {
+    console.error("Map container not found!");
+    return;
   }
   
-  // Set up the map with proper configuration
+  // Make map container bigger
+  mapContainer.style.height = '600px';
+  
+  // Clear any existing map
+  if (window.leafletMap) {
+    window.leafletMap.remove();
+    window.leafletMap = null;
+  }
+  
+  // Show loading indicator
+  const loadingDiv = document.createElement('div');
+  loadingDiv.id = 'map-loading';
+  loadingDiv.innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;background:rgba(30,30,30,0.8);padding:15px 25px;border-radius:8px;text-align:center;">Loading map...</div>';
+  mapContainer.appendChild(loadingDiv);
+  
+  // Get user location
+  navigator.geolocation.getCurrentPosition(
+    // Success callback
+    position => {
+      setupMap(position.coords.latitude, position.coords.longitude);
+    },
+    // Error callback
+    error => {
+      console.warn("Geolocation error:", error);
+      // Default to a central location
+      setupMap(40.7128, -74.0060); // New York
+    },
+    { timeout: 10000 }
+  );
+  
+  // Set up the map
   function setupMap(lat, lng) {
     console.log("Setting up map at:", lat, lng);
     
@@ -1409,20 +1399,18 @@ function initCafe() {
       map = L.map('map', {
         center: [lat, lng],
         zoom: 14,
-        zoomControl: true,
-        attributionControl: true
+        zoomControl: true
       });
       
       window.leafletMap = map;
       
-      // Add a tile layer - use a dark theme that matches our UI
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      // Add a tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        subdomains: 'abcd',
         maxZoom: 19
       }).addTo(map);
       
-      // Add user location marker - USING SIMPLE CIRCLE TO AVOID MARKER ISSUES
+      // Add user location marker - using SIMPLE CIRCLE
       const userCircle = L.circle([lat, lng], {
         radius: 300,
         color: '#4f46e5',
@@ -1430,302 +1418,125 @@ function initCafe() {
         fillOpacity: 0.4
       }).addTo(map);
       
-      userCircle.bindPopup("Your Location").openPopup();
+      userCircle.bindPopup("You are here").openPopup();
       
       // Add search radius visualization
       const searchRadius = L.circle([lat, lng], {
-        radius: 2500, // Larger radius to find more places
+        radius: 2000,
         color: '#8c67ff',
         fillColor: '#8c67ff',
         fillOpacity: 0.05,
         weight: 1
       }).addTo(map);
       
-      // Add simple map controls
-      addMapControls();
+      // Add simple filter control
+      const filterControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function() {
+          const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control filter-control');
+          container.innerHTML = `
+            <div style="background:#1e1e1e;padding:8px;border-radius:4px;">
+              <label style="display:block;margin-bottom:5px;font-size:12px;color:#b0b0b0;">Filter By</label>
+              <select id="cafe-filter" style="width:100%;padding:5px;background:#2d2d2d;color:#fafafa;border:1px solid rgba(255,255,255,0.1);border-radius:3px;">
+                <option value="all">All Places</option>
+                <option value="cafe">Cafés</option>
+                <option value="library">Libraries</option>
+                <option value="restaurant">Restaurants</option>
+              </select>
+            </div>
+          `;
+          
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.disableScrollPropagation(container);
+          
+          return container;
+        }
+      });
       
-      // Fetch real cafe data
-      fetchRealCafes(lat, lng, 2500);
+      // Add control to map
+      map.addControl(new filterControl());
+      
+      // Fetch real cafes
+      fetchCafes(lat, lng, 2000);
+      
+      // Add reload button
+      const reloadBtn = document.createElement('button');
+      reloadBtn.style.cssText = `
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        z-index: 999;
+        background: #8c67ff;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+      `;
+      reloadBtn.textContent = "Reload Map";
+      reloadBtn.onclick = function() {
+        window.location.reload();
+      };
+      mapContainer.appendChild(reloadBtn);
+      
+      // Add event listener for filter control
+      setTimeout(() => {
+        const filterSelect = document.getElementById('cafe-filter');
+        if (filterSelect) {
+          filterSelect.addEventListener('change', function() {
+            const value = this.value;
+            cafeMarkers.forEach(marker => {
+              if (value === 'all' || marker.options.cafeType === value) {
+                marker.setOpacity(1);
+              } else {
+                marker.setOpacity(0.3);
+              }
+            });
+          });
+        }
+      }, 300);
       
     } catch (err) {
       console.error("Map setup error:", err);
-      const errorDiv = document.createElement('div');
-      errorDiv.style.cssText = 'position:absolute;top:10px;left:10px;z-index:1000;background:rgba(255,100,100,0.9);color:white;padding:10px;border-radius:4px;';
-      errorDiv.textContent = "Error setting up map. Please reload the page.";
-      mapContainer.appendChild(errorDiv);
+      mapContainer.innerHTML = `
+        <div style="text-align:center;padding:20px;background:#222;color:white;border-radius:8px;">
+          <h3>Map Error</h3>
+          <p>There was a problem loading the map. Please try reloading the page.</p>
+          <button onclick="window.location.reload()" style="background:#8c67ff;color:white;border:none;padding:8px 16px;border-radius:4px;margin-top:10px;cursor:pointer;">
+            Reload Page
+          </button>
+        </div>
+      `;
     }
   }
   
-  // Add map controls
-  function addMapControls() {
-    // Add a search radius control
-    const radiusControl = L.Control.extend({
-      options: { position: 'topleft' },
-      onAdd: function() {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control radius-control');
-        container.innerHTML = `
-          <div style="background:#1e1e1e;padding:8px;border-radius:4px;">
-            <label style="display:block;margin-bottom:5px;font-size:12px;color:#b0b0b0;">Search Radius</label>
-            <input type="range" id="radius-slider" min="1000" max="5000" step="500" value="2500" style="width:100%;">
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:#b0b0b0;">
-              <span>1km</span>
-              <span>5km</span>
-            </div>
-          </div>
-        `;
-        
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.disableScrollPropagation(container);
-        
-        return container;
-      }
-    });
-    
-    // Add filter control
-    const filterControl = L.Control.extend({
-      options: { position: 'topright' },
-      onAdd: function() {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control filter-control');
-        container.innerHTML = `
-          <div style="background:#1e1e1e;padding:8px;border-radius:4px;">
-            <label style="display:block;margin-bottom:5px;font-size:12px;color:#b0b0b0;">Filter By</label>
-            <select id="cafe-filter" style="width:100%;padding:5px;background:#2d2d2d;color:#fafafa;border:1px solid rgba(255,255,255,0.1);border-radius:3px;">
-              <option value="all">All Places</option>
-              <option value="cafe">Cafés</option>
-              <option value="library">Libraries</option>
-              <option value="coworking">Coworking</option>
-              <option value="restaurant">Restaurants</option>
-              <option value="college">Universities</option>
-            </select>
-          </div>
-        `;
-        
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.disableScrollPropagation(container);
-        
-        return container;
-      }
-    });
-    
-    // Add search control
-    const searchControl = L.Control.extend({
-      options: { position: 'topleft' },
-      onAdd: function() {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control search-control');
-        container.innerHTML = `
-          <div style="position:relative;">
-            <input type="text" id="location-search" placeholder="Search location..." 
-                  style="padding:8px 12px;width:180px;border:none;border-radius:4px;background:#1e1e1e;color:#fafafa;">
-            <button id="search-button" style="position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;border:none;color:#8c67ff;cursor:pointer;">🔍</button>
-          </div>
-        `;
-        
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.disableScrollPropagation(container);
-        
-        return container;
-      }
-    });
-    
-    // Add controls to map
-    map.addControl(new radiusControl());
-    map.addControl(new filterControl());
-    map.addControl(new searchControl());
-    
-    // Add event listeners
-    setTimeout(() => {
-      // Radius slider event
-      document.getElementById('radius-slider')?.addEventListener('input', function() {
-        const radius = parseInt(this.value);
-        
-        // Update radius circle
-        const circles = [];
-        map.eachLayer((layer) => {
-          if (layer instanceof L.Circle && layer.getRadius() > 500) {
-            circles.push(layer);
-          }
-        });
-        
-        if (circles.length > 0) {
-          circles[0].setRadius(radius);
-        }
-        
-        // Clear existing cafes
-        clearCafes();
-        
-        // Fetch with new radius
-        fetchRealCafes(userLocation.lat, userLocation.lng, radius);
-      });
-      
-      // Filter change event
-      document.getElementById('cafe-filter')?.addEventListener('change', function() {
-        const filterValue = this.value;
-        
-        // Apply filter to markers
-        cafeMarkers.forEach(marker => {
-          if (filterValue === 'all' || marker.options.cafeType === filterValue) {
-            marker.setOpacity(1);
-          } else {
-            marker.setOpacity(0.3);
-          }
-        });
-        
-        // Update cafe list
-        updateCafeList(filterValue);
-      });
-      
-      // Search button click
-      document.getElementById('search-button')?.addEventListener('click', function() {
-        const searchInput = document.getElementById('location-search');
-        const searchText = searchInput?.value.trim();
-        
-        if (searchText) {
-          // Show loading state
-          searchInput.style.backgroundImage = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' width=\'20\' height=\'20\'%3E%3Cpath fill=\'none\' stroke=\'%238c67ff\' stroke-width=\'2\' d=\'M12,2 a10,10 0 1,0 10,10 a10,10 0 1,0 -10,-10 M12,12 L12,6\'%3E%3C/path%3E%3C/svg%3E")';
-          searchInput.style.backgroundRepeat = 'no-repeat';
-          searchInput.style.backgroundPosition = 'calc(100% - 10px) center';
-          
-          // Use Nominatim for geocoding
-          fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchText)}`)
-            .then(response => response.json())
-            .then(data => {
-              if (data && data.length > 0) {
-                const location = data[0];
-                const lat = parseFloat(location.lat);
-                const lng = parseFloat(location.lon);
-                
-                // Update user location
-                userLocation = { lat, lng };
-                
-                // Move map to new location
-                map.setView([lat, lng], 14);
-                
-                // Update user marker and search circle
-                updateLocationMarkers(lat, lng);
-                
-                // Clear existing cafes
-                clearCafes();
-                
-                // Fetch cafes at new location
-                const radius = parseInt(document.getElementById('radius-slider')?.value || 2500);
-                fetchRealCafes(lat, lng, radius);
-                
-                // Show success message
-                showMapMessage(`Found: ${location.display_name}`);
-              } else {
-                showMapMessage('Location not found. Try a different search.');
-              }
-              
-              // Reset input
-              searchInput.style.backgroundImage = 'none';
-            })
-            .catch(err => {
-              console.error('Search error:', err);
-              showMapMessage('Error searching. Please try again.');
-              searchInput.style.backgroundImage = 'none';
-            });
-        }
-      });
-      
-      // Enter key in search box
-      document.getElementById('location-search')?.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-          document.getElementById('search-button').click();
-        }
-      });
-    }, 300);
-  }
-  
-  // Update location markers (user location and search circle)
-  function updateLocationMarkers(lat, lng) {
-    // Remove existing user markers and search circles
-    map.eachLayer(layer => {
-      if ((layer instanceof L.Circle && layer.getRadius() > 500) || 
-          (layer instanceof L.Circle && layer.getRadius() <= 500 && layer.options.color === '#4f46e5')) {
-        map.removeLayer(layer);
-      }
-    });
-    
-    // Add new user location marker
-    const userCircle = L.circle([lat, lng], {
-      radius: 300,
-      color: '#4f46e5',
-      fillColor: '#4f46e5',
-      fillOpacity: 0.4
-    }).addTo(map);
-    
-    userCircle.bindPopup("Search Location").openPopup();
-    
-    // Add new search radius
-    const radius = parseInt(document.getElementById('radius-slider')?.value || 2500);
-    L.circle([lat, lng], {
-      radius: radius,
-      color: '#8c67ff',
-      fillColor: '#8c67ff',
-      fillOpacity: 0.05,
-      weight: 1
-    }).addTo(map);
-  }
-  
-  // Show map message
-  function showMapMessage(message) {
-    // Remove any existing message
-    const existingMsg = document.querySelector('.map-message');
-    if (existingMsg) existingMsg.remove();
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'map-message';
-    messageDiv.style.cssText = 'position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(30,30,30,0.9);color:#fafafa;padding:10px 15px;border-radius:4px;font-size:13px;max-width:80%;text-align:center;';
-    messageDiv.textContent = message;
-    mapContainer.appendChild(messageDiv);
-    
-    setTimeout(() => {
-      messageDiv.remove();
-    }, 4000);
-  }
-  
-  // Clear existing cafes
-  function clearCafes() {
-    cafeMarkers.forEach(marker => {
-      map.removeLayer(marker);
-    });
-    
-    cafeMarkers = [];
-    allCafes = [];
-  }
-  
-  // Fetch real cafes using Overpass API
-  function fetchRealCafes(lat, lng, radius = 2500) {
+  // Fetch cafes using OpenStreetMap's Overpass API
+  function fetchCafes(lat, lng, radius = 2000) {
     // Show loading indicator
     const loadingDiv = document.createElement('div');
     loadingDiv.id = 'cafes-loading';
     loadingDiv.innerHTML = `
       <div style="position:absolute;top:60px;right:10px;z-index:1000;background:rgba(30,30,30,0.8);
            padding:8px 12px;border-radius:4px;font-size:12px;color:#fafafa;">
-        <span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(140,103,255,0.3);
-              border-radius:50%;border-top-color:var(--ac-1);animation:spin 1s linear infinite;margin-right:8px;"></span>
         Finding cafes...
       </div>
-      <style>@keyframes spin {to {transform: rotate(360deg);}}</style>
     `;
     mapContainer.appendChild(loadingDiv);
     
-    // Create a more robust Overpass API query for study places
+    // Create query for OpenStreetMap
     const query = `
       [out:json][timeout:25];
       (
         node["amenity"="cafe"](around:${radius},${lat},${lng});
         node["amenity"="library"](around:${radius},${lat},${lng});
-        node["amenity"="coworking_space"](around:${radius},${lat},${lng});
         node["shop"="coffee"](around:${radius},${lat},${lng});
         node["amenity"="restaurant"]["cuisine"="coffee_shop"](around:${radius},${lat},${lng});
-        node["amenity"="college"](around:${radius},${lat},${lng});
-        node["amenity"="university"](around:${radius},${lat},${lng});
       );
       out body;
     `;
     
-    // Use the Overpass API to fetch real data
+    // Use fetch to get data
     fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
       headers: {
@@ -1737,32 +1548,45 @@ function initCafe() {
     .then(data => {
       // Remove loading indicator
       document.getElementById('cafes-loading')?.remove();
+      document.getElementById('map-loading')?.remove();
       
       if (data && data.elements && data.elements.length > 0) {
-        console.log(`Processing ${data.elements.length} real places`);
-        showMapMessage(`Found ${data.elements.length} study places nearby`);
+        console.log(`Found ${data.elements.length} cafes`);
         
-        // Process the results
+        // Process cafe data
         processCafes(data.elements);
       } else {
-        showMapMessage("No cafes found in this area. Try increasing the search radius or searching in a different location.");
+        console.log("No cafes found");
+        mapContainer.insertAdjacentHTML('beforeend', `
+          <div style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(30,30,30,0.8);
+               color:white;padding:10px 20px;border-radius:4px;text-align:center;">
+            No cafes found in this area. Try a different location.
+          </div>
+        `);
       }
     })
     .catch(error => {
-      console.error("Error fetching cafes:", error);
+      console.error("Fetch error:", error);
       document.getElementById('cafes-loading')?.remove();
+      document.getElementById('map-loading')?.remove();
       
-      showMapMessage("Error fetching cafe data. Please try again or try another location.");
+      // Show error message
+      mapContainer.insertAdjacentHTML('beforeend', `
+        <div style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(255,0,0,0.8);
+             color:white;padding:10px 20px;border-radius:4px;text-align:center;">
+          Error fetching cafe data. Please reload and try again.
+        </div>
+      `);
     });
   }
   
-  // Process cafes data from the API
+  // Process cafe data and add to map
   function processCafes(elements) {
-    // Filter only nodes (points) with tags
+    // Filter only nodes with tags
     const validNodes = elements.filter(el => el.type === 'node' && el.tags);
     
     if (validNodes.length === 0) {
-      showMapMessage("No suitable study places found. Try another location.");
+      console.log("No valid cafes found");
       return;
     }
     
@@ -1770,10 +1594,7 @@ function initCafe() {
     const colors = {
       cafe: '#8c67ff',
       library: '#4f46e5',
-      coworking_space: '#ff6f91',
       restaurant: '#f59e0b',
-      college: '#10b981',
-      university: '#10b981',
       default: '#8c67ff'
     };
     
@@ -1781,27 +1602,17 @@ function initCafe() {
     validNodes.forEach(node => {
       // Determine place type
       let placeType = 'default';
-      let typeName = 'Study Place';
       
       if (node.tags.amenity === 'cafe' || node.tags.shop === 'coffee') {
         placeType = 'cafe';
-        typeName = 'Café';
       } else if (node.tags.amenity === 'library') {
         placeType = 'library';
-        typeName = 'Library';
-      } else if (node.tags.amenity === 'coworking_space') {
-        placeType = 'coworking';
-        typeName = 'Coworking Space';
       } else if (node.tags.amenity === 'restaurant') {
         placeType = 'restaurant';
-        typeName = 'Restaurant';
-      } else if (node.tags.amenity === 'college' || node.tags.amenity === 'university') {
-        placeType = 'college';
-        typeName = 'University/College';
       }
       
-      // Get place name or generate one if missing
-      const placeName = node.tags.name || `${typeName} #${node.id.toString().slice(-4)}`;
+      // Get place name
+      const placeName = node.tags.name || `Cafe #${node.id.toString().slice(-4)}`;
       
       // Create cafe object
       const place = {
@@ -1810,18 +1621,13 @@ function initCafe() {
         lat: node.lat,
         lng: node.lon,
         type: placeType,
-        phone: node.tags.phone || node.tags['contact:phone'] || 'Not available',
-        website: node.tags.website || node.tags['contact:website'] || '',
-        opening_hours: node.tags.opening_hours || 'Hours not available',
-        wifi: node.tags.internet_access === 'wlan' ? 'Available' : 'Unknown',
-        power: node.tags.power_supply === 'yes' ? 'Available' : 'Unknown',
         address: formatAddress(node.tags)
       };
       
       // Add to cafes array
       allCafes.push(place);
       
-      // Create marker - using circleMarker for better compatibility
+      // Create marker - using circleMarker for reliability
       const marker = L.circleMarker([place.lat, place.lng], {
         radius: 8,
         color: colors[placeType],
@@ -1832,13 +1638,26 @@ function initCafe() {
       }).addTo(map);
       
       // Create popup content
-      const popupContent = createPopupContent(place, colors[placeType]);
+      const popupContent = `
+        <div style="width:200px;">
+          <h3 style="margin:0 0 8px;color:${colors[placeType]};font-size:16px;">${place.name}</h3>
+          <div style="margin:5px 0;font-size:12px;">
+            <strong>Type:</strong> ${placeType === 'cafe' ? 'Café' : (placeType === 'library' ? 'Library' : 'Restaurant')}
+          </div>
+          ${place.address !== 'Address not available' ? `
+            <div style="margin:5px 0;font-size:12px;">
+              <strong>Address:</strong> ${place.address}
+            </div>
+          ` : ''}
+          <button onclick="selectCafeForReview('${place.name.replace(/'/g, "\\'")}')" 
+            style="width:100%;margin-top:8px;background:${colors[placeType]};color:white;border:none;padding:6px;border-radius:4px;cursor:pointer;">
+            Add Review
+          </button>
+        </div>
+      `;
       
-      // Add popup to marker
-      marker.bindPopup(popupContent, {
-        maxWidth: 260,
-        minWidth: 200
-      });
+      // Add popup
+      marker.bindPopup(popupContent);
       
       // Add to markers array
       cafeMarkers.push(marker);
@@ -1846,10 +1665,6 @@ function initCafe() {
     
     // Update cafe list for the review form
     updateCafeList();
-    
-    // Remove loading indicator if it still exists
-    const loadingElement = document.getElementById('map-loading');
-    if (loadingElement) loadingElement.remove();
   }
   
   // Format address from OSM tags
@@ -1864,195 +1679,25 @@ function initCafe() {
     return parts.join(', ') || 'Address not available';
   }
   
-  // Create popup content
-  function createPopupContent(place, color) {
-    let hoursText = place.opening_hours;
-    
-    // Format opening hours nicely if available
-    if (place.opening_hours && place.opening_hours.includes(';')) {
-      hoursText = place.opening_hours.split(';').join('<br>');
-    }
-    
-    return `
-      <div style="width:240px;padding:5px 0;">
-        <h3 style="margin:0 0 8px;color:${color};font-size:16px;font-weight:bold;">${place.name}</h3>
-        
-        <div style="margin:5px 0;font-size:12px;color:#b0b0b0;">
-          <span style="background:rgba(140,103,255,0.15);color:#fafafa;padding:3px 8px;border-radius:12px;
-                display:inline-block;margin-right:5px;">
-            ${getTypeDisplay(place.type)}
-          </span>
-        </div>
-        
-        ${place.address !== 'Address not available' ? 
-          `<p style="margin:8px 0;font-size:13px;"><strong>Address:</strong><br>${place.address}</p>` : ''}
-        
-        <div style="margin:10px 0;padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;font-size:13px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-            <span><strong>WiFi:</strong></span>
-            <span>${place.wifi}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span><strong>Power Outlets:</strong></span>
-            <span>${place.power}</span>
-          </div>
-        </div>
-        
-        ${place.opening_hours !== 'Hours not available' ? 
-          `<div style="margin:10px 0;font-size:12px;">
-             <strong>Hours:</strong><br>
-             <span style="color:#b0b0b0;font-size:11px;">${hoursText}</span>
-           </div>` 
-          : ''}
-        
-        <div style="display:flex;gap:5px;margin-top:10px;">
-          <a href="https://www.google.com/maps/search/?api=1&query=${
-            encodeURIComponent(place.name) + ' near ' + place.lat + ',' + place.lng}" 
-            target="_blank" 
-            style="flex:1;text-decoration:none;background:#4285F4;color:white;padding:6px 0;border-radius:4px;font-size:13px;text-align:center;">
-            Google Maps
-          </a>
-          ${place.website ? 
-            `<a href="${place.website}" target="_blank" 
-               style="flex:1;text-decoration:none;background:#10b981;color:white;padding:6px 0;border-radius:4px;font-size:13px;text-align:center;">
-               Website
-             </a>` 
-            : ''}
-        </div>
-        
-        <button onclick="selectCafeForReview('${place.name.replace(/'/g, "\\'")}')" 
-          style="width:100%;margin-top:8px;background:${color};color:white;border:none;padding:6px 0;border-radius:4px;cursor:pointer;font-size:13px;">
-          Add Review
-        </button>
-      </div>
-    `;
-  }
-  
-  // Helper to get a nice display for place types
-  function getTypeDisplay(type) {
-    const typeMap = {
-      'cafe': 'Café',
-      'library': 'Library',
-      'coworking': 'Coworking Space',
-      'restaurant': 'Restaurant',
-      'college': 'University/College',
-      'default': 'Study Place'
-    };
-    
-    return typeMap[type] || typeMap.default;
-  }
-  
-  // Update cafe list for the review form dropdown
-  function updateCafeList(filter = 'all') {
+  // Update cafe list for dropdown
+  function updateCafeList() {
     if (!cafeList) return;
     
     // Clear existing options
     cafeList.innerHTML = '';
     
-    // Filter cafes if needed
-    let filteredCafes = [...allCafes];
-    if (filter !== 'all') {
-      filteredCafes = filteredCafes.filter(cafe => cafe.type === filter);
-    }
-    
-    // Sort alphabetically
-    filteredCafes.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort cafes alphabetically
+    const sortedCafes = [...allCafes].sort((a, b) => a.name.localeCompare(b.name));
     
     // Add to datalist
-    filteredCafes.forEach(cafe => {
+    sortedCafes.forEach(cafe => {
       const option = document.createElement('option');
       option.value = cafe.name;
       cafeList.appendChild(option);
     });
   }
   
-  // Set up review form
-  function setupReviewForm() {
-    if (!reviewForm || !reviewName) return;
-    
-    // Handle form submission
-    reviewForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      // Get form values
-      const name = reviewName.value.trim();
-      const rating = document.getElementById('reviewRating').value;
-      const category = document.getElementById('reviewCategory').value;
-      const text = document.getElementById('reviewText').value.trim();
-      
-      // Validate
-      if (!name || !rating || !category || !text) {
-        alert('Please fill in all fields');
-        return;
-      }
-      
-      // Get existing reviews
-      let reviews = [];
-      try {
-        reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
-      } catch (e) {
-        console.error('Error parsing reviews:', e);
-        reviews = [];
-      }
-      
-      // Add new review
-      reviews.push({
-        name: name,
-        rating: parseInt(rating),
-        category: category,
-        text: text,
-        date: new Date().toISOString().split('T')[0]
-      });
-      
-      // Save to localStorage
-      localStorage.setItem('sb-reviews', JSON.stringify(reviews));
-      
-      // Reset form
-      this.reset();
-      
-      // Show success message
-      const successMsg = document.createElement('div');
-      successMsg.style.cssText = 'background:rgba(16,185,129,0.2);color:#10b981;padding:10px;border-radius:4px;margin-top:10px;text-align:center;';
-      successMsg.textContent = 'Review added successfully!';
-      this.appendChild(successMsg);
-      
-      // Remove message after 3 seconds
-      setTimeout(() => successMsg.remove(), 3000);
-      
-      // Update reviews display
-      renderReviews();
-    });
-    
-    // Handle cafe selection
-    reviewName.addEventListener('input', function() {
-      const selectedCafe = allCafes.find(c => c.name === this.value);
-      if (selectedCafe) {
-        // Pan to the cafe location
-        map.setView([selectedCafe.lat, selectedCafe.lng], 16);
-        
-        // Find marker and highlight
-        cafeMarkers.forEach((marker, index) => {
-          const cafe = allCafes[index];
-          if (cafe && cafe.name === selectedCafe.name) {
-            marker.setStyle({
-              radius: 12, // Make it bigger
-              weight: 3,  // Make border thicker
-            });
-            setTimeout(() => {
-              marker.setStyle({
-                radius: 8,
-                weight: 2
-              });
-            }, 2000);
-            
-            marker.openPopup();
-          }
-        });
-      }
-    });
-  }
-  
-  // Select cafe for review - global function
+  // Global cafe selection function
   window.selectCafeForReview = function(cafeName) {
     if (reviewName) {
       reviewName.value = cafeName;
@@ -2067,207 +1712,104 @@ function initCafe() {
     }
   };
   
-  // Render reviews
-  function renderReviews() {
-    const container = document.getElementById('cafeReviews');
-    if (!container) return;
+  // Fix review form submission
+  if (reviewForm) {
+    // Clear existing handlers
+    const oldSubmit = reviewForm.onsubmit;
+    reviewForm.onsubmit = null;
     
-    // Get reviews
-    let reviews = [];
-    try {
-      reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
-    } catch (e) {
-      console.error('Error parsing reviews:', e);
-      reviews = [];
-    }
-    
-    // Clear container
-    container.innerHTML = '';
-    
-    // Check if we have reviews
-    if (reviews.length === 0) {
-      container.innerHTML = `
-        <div class="card" style="text-align:center;padding:2rem;">
-          <div style="font-size:3rem;margin-bottom:1rem;">📝</div>
-          <h3 style="margin-bottom:1rem;color:#b0b0b0;">No Reviews Yet</h3>
-          <p>Share your experience at your favorite study spots!</p>
-        </div>
-      `;
-      return;
-    }
-    
-    // Group reviews by cafe name
-    const reviewsByPlace = {};
-    reviews.forEach(review => {
-      if (!reviewsByPlace[review.name]) {
-        reviewsByPlace[review.name] = [];
+    // Add new submit handler
+    reviewForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      console.log("Review form submitted");
+      
+      // Get form values
+      const name = reviewName?.value || '';
+      const rating = document.getElementById('reviewRating')?.value || '';
+      const category = document.getElementById('reviewCategory')?.value || '';
+      const text = document.getElementById('reviewText')?.value || '';
+      
+      console.log("Review values:", {name, rating, category, text});
+      
+      // Only validate the ones that exist to avoid errors
+      if (!name.trim()) {
+        alert("Please enter or select a cafe name");
+        return;
       }
-      reviewsByPlace[review.name].push(review);
-    });
-    
-    // Create element for reviews heading
-    const heading = document.createElement('h3');
-    heading.className = 'section-subtitle';
-    heading.style.cssText = 'margin:1.5rem 0 1rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.5rem;';
-    heading.textContent = 'Your Café Reviews';
-    container.appendChild(heading);
-    
-    // Create the reviews grid
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;';
-    container.appendChild(grid);
-    
-    // Add cards for each cafe
-    Object.keys(reviewsByPlace).sort().forEach(cafeName => {
-      const cafeReviews = reviewsByPlace[cafeName];
       
-      // Calculate average rating
-      const avgRating = cafeReviews.reduce((sum, r) => sum + r.rating, 0) / cafeReviews.length;
+      if (!rating) {
+        alert("Please select a rating");
+        return;
+      }
       
-      // Get most common category
-      const categories = cafeReviews.map(r => r.category);
-      const mostCommonCategory = categories.sort((a, b) => 
-        categories.filter(c => c === a).length - categories.filter(c => c === b).length
-      ).pop();
+      if (!category) {
+        alert("Please select a category");
+        return;
+      }
       
-      // Create card
-      const card = document.createElement('div');
-      card.className = 'card';
+      if (!text.trim()) {
+        alert("Please enter a review");
+        return;
+      }
       
-      // Card header
-      const header = document.createElement('div');
-      header.style.cssText = 'margin-bottom:0.8rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.8rem;';
+      // Get existing reviews
+      let reviews = [];
+      try {
+        reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+      } catch (e) {
+        console.error("Error parsing reviews:", e);
+        reviews = [];
+      }
       
-      // Cafe name and rating
-      header.innerHTML = `
-        <h3 style="margin:0 0 0.8rem;font-size:1.3rem;">${cafeName}</h3>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="color:#f2c94c;font-size:1.2rem;">
-            ${Array(Math.round(avgRating)).fill('★').join('')}${Array(5-Math.round(avgRating)).fill('☆').join('')}
-          </div>
-          <span style="color:#b0b0b0;font-size:0.8rem;">
-            ${cafeReviews.length} review${cafeReviews.length > 1 ? 's' : ''}
-          </span>
-        </div>
-        ${mostCommonCategory ? `
-          <div style="margin-top:0.5rem;">
-            <span style="display:inline-block;background:rgba(140,103,255,0.2);color:#fafafa;
-                  font-size:0.7rem;padding:3px 8px;border-radius:12px;">
-              Best for: ${mostCommonCategory}
-            </span>
-          </div>
-        ` : ''}
-      `;
-      card.appendChild(header);
-      
-      // Reviews
-      const reviewsList = document.createElement('div');
-      reviewsList.style.cssText = 'max-height:300px;overflow-y:auto;padding-right:0.5rem;';
-      
-      // Add each review
-      cafeReviews.forEach((review, i) => {
-        const reviewItem = document.createElement('div');
-        reviewItem.style.cssText = i < cafeReviews.length-1 ? 
-          'margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid rgba(255,255,255,0.05);' : '';
-        
-        // Format date
-        let displayDate = review.date || 'No date';
-        try {
-          if (review.date) {
-            displayDate = new Date(review.date).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            });
-          }
-        } catch (e) {
-          console.error("Date formatting error:", e);
-        }
-        
-        reviewItem.innerHTML = `
-          <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem;">
-            <div style="color:#f2c94c;">
-              ${Array(review.rating).fill('★').join('')}${Array(5-review.rating).fill('☆').join('')}
-            </div>
-            <div style="color:#b0b0b0;font-size:0.8rem;">${displayDate}</div>
-          </div>
-          <p style="margin:0 0 0.5rem;font-size:0.9rem;line-height:1.4;">${review.text}</p>
-          ${review.category ? `
-            <span style="display:inline-block;background:rgba(140,103,255,0.1);color:#b0b0b0;
-                  font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-top:0.3rem;">
-              ${review.category}
-            </span>
-          ` : ''}
-        `;
-        
-        // Add delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-review';
-        deleteBtn.style.cssText = 'background:none;border:none;color:#f2c94c;font-size:1rem;cursor:pointer;position:absolute;top:10px;right:10px;';
-        deleteBtn.innerHTML = '×';
-        deleteBtn.dataset.cafe = cafeName;
-        deleteBtn.dataset.index = i;
-        
-        reviewItem.style.position = 'relative';
-        reviewItem.appendChild(deleteBtn);
-        reviewsList.appendChild(reviewItem);
+      // Add new review
+      reviews.push({
+        name: name.trim(),
+        rating: parseInt(rating),
+        category: category,
+        text: text.trim(),
+        date: new Date().toISOString().split('T')[0]
       });
       
-      card.appendChild(reviewsList);
-      grid.appendChild(card);
-    });
-    
-    // Add event listeners to delete buttons
-    container.querySelectorAll('.delete-review').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const cafeName = this.dataset.cafe;
-        const reviewIndex = parseInt(this.dataset.index);
-        
-        // Confirm deletion
-        if (confirm('Delete this review?')) {
-          // Find all reviews for this cafe
-          let reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
-          const cafeReviews = reviews.filter(r => r.name === cafeName);
-          
-          if (reviewIndex >= 0 && reviewIndex < cafeReviews.length) {
-            // Find the global index
-            const reviewToDelete = cafeReviews[reviewIndex];
-            const globalIndex = reviews.findIndex(r => 
-              r.name === reviewToDelete.name && 
-              r.text === reviewToDelete.text && 
-              r.date === reviewToDelete.date
-            );
-            
-            if (globalIndex !== -1) {
-              // Remove from array
-              reviews.splice(globalIndex, 1);
-              
-              // Save to localStorage
-              localStorage.setItem('sb-reviews', JSON.stringify(reviews));
-              
-              // Re-render
-              renderReviews();
-            }
-          }
-        }
-      });
+      // Save to localStorage
+      localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+      
+      // Reset form
+      this.reset();
+      
+      // Show success message
+      alert("Review added successfully!");
+      
+      // Update reviews display if function exists
+      if (typeof renderReviews === 'function') {
+        renderReviews();
+      }
     });
   }
-  
-  // Initialize all components
-  initializeMap();
-  setupReviewForm();
-  renderReviews();
-  
-  // Add event listener for window resize to keep map responsive
-  let resizeTimer;
-  window.addEventListener('resize', function() {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function() {
-      if (map) map.invalidateSize();
-    }, 200);
-  });
 }
+
+// Call this function instead of the original initCafe
+document.addEventListener('DOMContentLoaded', function() {
+  // Ensure Leaflet is loaded
+  if (typeof L === 'undefined') {
+    // Load Leaflet CSS
+    const leafletCSS = document.createElement('link');
+    leafletCSS.rel = 'stylesheet';
+    leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(leafletCSS);
+    
+    // Load Leaflet JS
+    const leafletScript = document.createElement('script');
+    leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    leafletScript.onload = function() {
+      console.log("Leaflet loaded, initializing cafe map");
+      initCafe();
+    };
+    document.head.appendChild(leafletScript);
+  } else {
+    initCafe();
+  }
+});
+
 // Add this function to make "selectCafeForReview" globally available
 window.selectCafeForReview = function(cafeName) {
   const reviewName = document.getElementById('reviewName');
@@ -2335,13 +1877,19 @@ window.selectCafeForReview = function(cafeName) {
     // PLANNER
 // PLANNER - Enhanced with better formatting
 // Enhanced Planner with beautiful formatting
+// DIRECT REPLACEMENT FOR PLANNER IMPLEMENTATION
 function initPlanner() {
+  console.log("Initializing enhanced planner");
+  
+  // Helper functions to get and save plans
   const getP = () => JSON.parse(localStorage.getItem('sb-plans') || '[]');
   const saveP = a => localStorage.setItem('sb-plans', JSON.stringify(a));
   
   // Render plans with improved UI
   const renderP = () => {
     const wrap = document.getElementById('planList');
+    if (!wrap) return;
+    
     const plans = getP();
     wrap.innerHTML = '';
     
@@ -2389,7 +1937,7 @@ function initPlanner() {
           </small>
         </div>
         <p style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; margin-top:5px;">${p.desc}</p>
-        <button class="btn btn-small btn-secondary delete-plan" data-index="${i}">×</button>
+        <button class="delete-plan" data-index="${i}" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--ac-warn);font-weight:bold;font-size:1.2rem;cursor:pointer;">×</button>
       `;
       wrap.append(c);
     });
@@ -2404,228 +1952,254 @@ function initPlanner() {
     });
   };
   
-  // Handle form submission with enhanced validation
-  document.getElementById('plannerForm').addEventListener('submit', e => {
-    e.preventDefault();
+  // Set up planner form
+  const plannerForm = document.getElementById('plannerForm');
+  if (plannerForm) {
+    // Remove any existing handlers
+    plannerForm.onsubmit = null;
     
-    const title = document.getElementById('planTitle').value.trim();
-    const category = document.getElementById('planCat').value;
-    const desc = document.getElementById('planDesc').value.trim();
-    const date = document.getElementById('planDate').value;
-    
-    // Basic validation
-    if (!title || !category || !date) {
-      // Show error message
-      const errorMsg = document.createElement('div');
-      errorMsg.style.cssText = 'background:rgba(255,111,145,0.2);color:#ff6f91;padding:10px;border-radius:var(--rad-s);margin-top:10px;text-align:center;';
-      errorMsg.textContent = 'Please fill in all required fields';
-      e.target.appendChild(errorMsg);
+    // Add new submit handler
+    plannerForm.addEventListener('submit', e => {
+      e.preventDefault();
       
-      // Remove after 3 seconds
-      setTimeout(() => errorMsg.remove(), 3000);
-      return;
-    }
-    
-    const arr = getP();
-    arr.push({
-      title: title,
-      category: category,
-      desc: desc,
-      date: date
-    });
-    
-    saveP(arr);
-    renderP();
-    e.target.reset();
-    
-    // Show a small success message
-    const form = document.getElementById('plannerForm');
-    const msg = document.createElement('div');
-    msg.style.cssText = 'background:rgba(79,144,229,0.2);color:#88ccff;padding:10px;border-radius:var(--rad-s);margin-top:10px;text-align:center;';
-    msg.innerHTML = '✅ Task added successfully!';
-    form.appendChild(msg);
-    
-    setTimeout(() => {
-      msg.remove();
-    }, 3000);
-  });
-  
-  // Enhanced study plan generation with beautiful formatting
-  document.getElementById('planStudy').onclick = async () => {
-    const tasks = getP();
-    const plannerAdvice = document.getElementById('plannerAdvice');
-    
-    if (!tasks.length) {
-      plannerAdvice.innerHTML = "<div style='text-align:center;padding:20px;'>Please add some tasks first.</div>";
-      return;
-    }
-    
-    // Show loading state
-    plannerAdvice.innerHTML = `
-      <div style='text-align:center;padding:20px;'>
-        <div style='display:inline-block;width:30px;height:30px;border:3px solid rgba(140,103,255,0.3);
-          border-radius:50%;border-top-color:var(--ac-1);animation:spin 1s linear infinite;'></div>
-        <p style='margin-top:10px;'>Generating your personalized study plan...</p>
-      </div>
-      <style>
-        @keyframes spin { to { transform: rotate(360deg); } }
-      </style>
-    `;
-    
-    // Sort tasks by date
-    tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-    const today = new Date();
-    const formattedToday = today.toISOString().split('T')[0];
-    
-    // Create a more detailed request for better response
-    const msg = `I have these academic tasks:\n${tasks.map(t => 
-      `- ${t.title} (${t.category}), due ${t.date}: ${t.desc}`
-    ).join('\n')}\n\nToday is ${formattedToday}. Please give me a detailed day-by-day study plan that's optimized for productivity and learning. For each day, suggest specific time blocks, study techniques, and breaks. Use emojis and clear formatting.`;
-    
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: msg})
+      const title = document.getElementById('planTitle')?.value?.trim() || '';
+      const category = document.getElementById('planCat')?.value || '';
+      const desc = document.getElementById('planDesc')?.value?.trim() || '';
+      const date = document.getElementById('planDate')?.value || '';
+      
+      console.log("Plan values:", {title, category, desc, date});
+      
+      // Basic validation
+      if (!title) {
+        alert("Please enter a title");
+        return;
+      }
+      
+      if (!category) {
+        alert("Please select a category");
+        return;
+      }
+      
+      if (!date) {
+        alert("Please select a date");
+        return;
+      }
+      
+      const arr = getP();
+      arr.push({
+        title: title,
+        category: category,
+        desc: desc,
+        date: date
       });
       
-      const data = await res.json();
-      let studyPlan = data.reply || 'No advice available.';
+      saveP(arr);
+      renderP();
+      e.target.reset();
       
-      // Create a container for the styled plan
-      const container = document.createElement('div');
-      container.style.cssText = 'max-height:500px;overflow-y:auto;padding:20px;background:var(--bg-2);border-radius:var(--rad-m);margin-top:20px;border:1px solid rgba(255,255,255,0.05);box-shadow:var(--shadow-s);';
-      
-      // Add a title
-      const title = document.createElement('h2');
-      title.style.cssText = 'text-align:center;margin-bottom:25px;color:var(--ac-1);font-size:1.5rem;';
-      title.innerHTML = '✨ Your Personalized Study Plan ✨';
-      container.appendChild(title);
-      
-      // Process and enhance formatting of the study plan content
-      let enhancedPlan = processStudyPlan(studyPlan);
-      
-      // Create content container
-      const content = document.createElement('div');
-      content.innerHTML = enhancedPlan;
-      container.appendChild(content);
-      
-      // Add download button
-      const downloadDiv = document.createElement('div');
-      downloadDiv.style.cssText = 'text-align:center;margin-top:25px;padding-top:20px;border-top:1px dashed rgba(255,255,255,0.1);';
-      
-      const downloadBtn = document.createElement('button');
-      downloadBtn.className = 'btn btn-primary';
-      downloadBtn.style.cssText = 'margin:auto;';
-      downloadBtn.innerHTML = '📥 Download Plan';
-      downloadBtn.onclick = () => downloadStudyPlan(studyPlan);
-      
-      downloadDiv.appendChild(downloadBtn);
-      container.appendChild(downloadDiv);
-      
-      // Clear the container and add our beautifully formatted plan
-      plannerAdvice.innerHTML = '';
-      plannerAdvice.appendChild(container);
-      
-    } catch (error) {
-      plannerAdvice.innerHTML = `
-        <div style="padding:15px;background:rgba(255,100,100,0.1);border-radius:var(--rad-s);color:#ff6464;">
-          <p>😔 Sorry, there was an error generating your study plan. Please try again later.</p>
-        </div>`;
-      console.error("Plan generation error:", error);
-    }
-  };
-  
-  // Process study plan text to enhance formatting
-  function processStudyPlan(text) {
-    let processedText = text
-      // Format day headers
-      .replace(/(?:^|\n)(?:\*\*)?(?:📅\s*)?(?:Day \d+:)?\s*([A-Za-z]+day),?\s*([A-Za-z]+ \d+(?:st|nd|rd|th)?)(?:\*\*)?/g, 
-        '<div class="day-header"><h3>📅 $1, $2</h3></div>')
-      
-      // Format time blocks
-      .replace(/(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)\s*[-–—]\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm))/g, 
-        '<span class="time-block">⏰ $1</span>')
-      
-      // Format task names
-      .replace(/(?:\*\*)([^*]+?)(?:\*\*)/g, '<strong>$1</strong>')
-      
-      // Format bullet points
-      .replace(/^\s*[-•*]\s+(.+)$/gm, '<div class="task-item"><span class="bullet">•</span><span>$1</span></div>')
-      
-      // Format technique suggestions
-      .replace(/(Technique|Tip|Method|Strategy):\s*([^.!?]+[.!?])/g, 
-        '<div class="study-tip"><span class="tip-label">$1:</span> $2</div>');
-    
-    // Add custom CSS
-    const customCSS = `
-      <style>
-        .day-header {
-          margin-top: 20px;
-          margin-bottom: 15px;
-        }
-        .day-header h3 {
-          color: var(--ac-1);
-          border-bottom: 1px solid var(--ac-1);
-          padding-bottom: 5px;
-          font-size: 1.2rem;
-        }
-        .time-block {
-          background: rgba(140,103,255,0.2);
-          padding: 3px 10px;
-          border-radius: 12px;
-          font-weight: bold;
-          margin-right: 5px;
-          font-size: 0.9rem;
-        }
-        .task-item {
-          display: flex;
-          margin: 8px 0;
-          line-height: 1.5;
-        }
-        .bullet {
-          margin-right: 10px;
-          color: var(--ac-1);
-        }
-        strong {
-          color: var(--ac-1);
-        }
-        .study-tip {
-          background: rgba(255,111,145,0.1);
-          padding: 10px 15px;
-          border-radius: var(--rad-s);
-          margin: 12px 0;
-          border-left: 3px solid var(--ac-3);
-        }
-        .tip-label {
-          color: var(--ac-3);
-          font-weight: bold;
-        }
-      </style>
-    `;
-    
-    return customCSS + processedText;
+      // Show success message
+      alert("Task added successfully!");
+    });
   }
   
-  // Download study plan as text
-  function downloadStudyPlan(studyPlan) {
-    // Clean up the plan text by removing markdown and special formatting
-    const cleanPlan = studyPlan
-      .replace(/\*\*/g, '')
-      .replace(/\[/g, '')
-      .replace(/\]/g, '');
-    
-    // Create blob and download link
-    const blob = new Blob(['# My StudyBuddy Plan\n\n' + cleanPlan], {type: 'text/plain'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'StudyPlan.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Enhanced study plan generation
+  const planStudyBtn = document.getElementById('planStudy');
+  if (planStudyBtn) {
+    planStudyBtn.onclick = async () => {
+      const tasks = getP();
+      const plannerAdvice = document.getElementById('plannerAdvice');
+      if (!plannerAdvice) return;
+      
+      if (!tasks.length) {
+        plannerAdvice.innerHTML = "<div style='text-align:center;padding:20px;'>Please add some tasks first.</div>";
+        return;
+      }
+      
+      // Show loading state
+      plannerAdvice.innerHTML = `
+        <div style='text-align:center;padding:20px;'>
+          <div style='display:inline-block;width:30px;height:30px;border:3px solid rgba(140,103,255,0.3);
+            border-radius:50%;border-top-color:var(--ac-1);animation:spin 1s linear infinite;'></div>
+          <p style='margin-top:10px;'>Generating your personalized study plan...</p>
+        </div>
+        <style>
+          @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+      `;
+      
+      // Sort tasks by date
+      tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      const today = new Date();
+      const formattedToday = today.toISOString().split('T')[0];
+      
+      // Create a detailed request for better response
+      const msg = `I have these academic tasks:\n${tasks.map(t => 
+        `- ${t.title} (${t.category}), due ${t.date}: ${t.desc}`
+      ).join('\n')}\n\nToday is ${formattedToday}. Please give me a detailed day-by-day study plan that's optimized for productivity and learning. For each day, suggest specific time blocks, study techniques, and breaks. Use emojis and clear formatting.`;
+      
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: msg})
+        });
+        
+        const data = await res.json();
+        let studyPlan = data.reply || 'No advice available.';
+        
+        // Create a beautifully styled container for the plan
+        const styledPlan = document.createElement('div');
+        styledPlan.style.cssText = 'max-height:500px;overflow-y:auto;padding:20px;background:var(--bg-2);border-radius:var(--rad-m);margin-top:20px;border:1px solid rgba(255,255,255,0.05);box-shadow:var(--shadow-s);';
+        
+        // Add CSS styles for the plan
+        const styleElement = document.createElement('style');
+        styleElement.textContent = `
+          .study-plan-title {
+            text-align: center;
+            margin-bottom: 25px;
+            color: var(--ac-1);
+            font-size: 1.5rem;
+          }
+          
+          .day-header {
+            margin-top: 20px;
+            margin-bottom: 15px;
+            color: var(--ac-1);
+            border-bottom: 1px solid var(--ac-1);
+            padding-bottom: 5px;
+            font-size: 1.2rem;
+          }
+          
+          .time-block {
+            background: rgba(140,103,255,0.2);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            margin-right: 5px;
+            font-size: 0.9rem;
+          }
+          
+          .task-item {
+            display: flex;
+            margin: 8px 0;
+            line-height: 1.5;
+          }
+          
+          .bullet {
+            margin-right: 10px;
+            color: var(--ac-1);
+          }
+          
+          .study-plan-content strong {
+            color: var(--ac-1);
+          }
+          
+          .study-tip {
+            background: rgba(255,111,145,0.1);
+            padding: 10px 15px;
+            border-radius: var(--rad-s);
+            margin: 12px 0;
+            border-left: 3px solid var(--ac-3);
+          }
+          
+          .tip-label {
+            color: var(--ac-3);
+            font-weight: bold;
+          }
+          
+          .download-button {
+            display: block;
+            margin: 20px auto 10px;
+            background: var(--ac-1);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--rad-s);
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+          
+          .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+          }
+        `;
+        styledPlan.appendChild(styleElement);
+        
+        // Add title
+        const title = document.createElement('h2');
+        title.className = 'study-plan-title';
+        title.innerHTML = '✨ Your Personalized Study Plan ✨';
+        styledPlan.appendChild(title);
+        
+        // Create content container with enhanced formatting
+        const content = document.createElement('div');
+        content.className = 'study-plan-content';
+        
+        // Process and enhance the study plan text with formatting
+        let enhancedPlan = studyPlan
+          // Format day headers
+          .replace(/(?:^|\n)(?:\*\*)?(?:📅\s*)?(?:Day \d+:)?\s*([A-Za-z]+day),?\s*([A-Za-z]+ \d+(?:st|nd|rd|th)?)(?:\*\*)?/g, 
+            '<div class="day-header"><h3>📅 $1, $2</h3></div>')
+          
+          // Format time blocks
+          .replace(/(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)\s*[-–—]\s*\d{1,2}:\d{2}\s*(?:AM|PM|am|pm))/g, 
+            '<span class="time-block">⏰ $1</span>')
+          
+          // Format task names
+          .replace(/(?:\*\*)([^*]+?)(?:\*\*)/g, '<strong>$1</strong>')
+          
+          // Format bullet points
+          .replace(/^\s*[-•*]\s+(.+)$/gm, '<div class="task-item"><span class="bullet">•</span><span>$1</span></div>')
+          
+          // Format technique suggestions
+          .replace(/(Technique|Tip|Method|Strategy):\s*([^.!?]+[.!?])/g, 
+            '<div class="study-tip"><span class="tip-label">$1:</span> $2</div>');
+        
+        content.innerHTML = enhancedPlan;
+        styledPlan.appendChild(content);
+        
+        // Add download button
+        const downloadButton = document.createElement('button');
+        downloadButton.className = 'download-button';
+        downloadButton.innerHTML = '📥 Download Study Plan';
+        downloadButton.onclick = function() {
+          // Clean up the plan text
+          const planText = studyPlan
+            .replace(/\*\*/g, '')
+            .replace(/\[/g, '')
+            .replace(/\]/g, '');
+          
+          // Create and download a text file
+          const blob = new Blob(['# My StudyBuddy Plan\n\n' + planText], {type: 'text/plain'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'StudyPlan.txt';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+        styledPlan.appendChild(downloadButton);
+        
+        // Add the styled plan to the page
+        plannerAdvice.innerHTML = '';
+        plannerAdvice.appendChild(styledPlan);
+        
+      } catch (error) {
+        console.error("Plan generation error:", error);
+        plannerAdvice.innerHTML = `
+          <div style="padding:15px;background:rgba(255,100,100,0.1);border-radius:var(--rad-s);color:#ff6464;">
+            <p>😔 Sorry, there was an error generating your study plan. Please try again later.</p>
+            <button onclick="document.getElementById('planStudy').click()" 
+                    style="background:rgba(255,255,255,0.2);border:none;color:white;padding:5px 15px;border-radius:4px;margin-top:10px;cursor:pointer;">
+              Try Again
+            </button>
+          </div>`;
+      }
+    };
   }
   
   // Add category options programmatically
@@ -2641,9 +2215,375 @@ function initPlanner() {
     });
   }
   
+  // Add custom CSS for better styling
+  const styleElement = document.createElement('style');
+  styleElement.textContent = `
+    /* Add styling for the planner */
+    #planList .card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      margin-bottom: 1rem;
+    }
+    
+    #planList .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(to bottom, var(--ac-1), var(--ac-3));
+      border-radius: var(--rad-s) 0 0 var(--rad-s);
+    }
+    
+    #planList .card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-l);
+    }
+    
+    #plannerForm {
+      background: var(--bg-3);
+      padding: 1.5rem;
+      border-radius: var(--rad-m);
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    #planStudy {
+      background: linear-gradient(135deg, var(--ac-1), var(--ac-2));
+      padding: 0.8rem 1.6rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+      margin-bottom: 1rem;
+    }
+    
+    #planStudy:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 15px rgba(140, 103, 255, 0.3);
+    }
+  `;
+  document.head.appendChild(styleElement);
+  
   // Initialize UI
   renderP();
 }
+
+// Call the planner initialization
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize enhanced planner
+  initPlanner();
+});
+
+// Complete Integration and Fixes
+// This script should be loaded after the original StudyBuddy scripts
+// It will fix both the review form validation and maps functionality
+
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("StudyBuddy enhancements loading...");
+  
+  // Add Leaflet CSS if not already present
+  if (!document.querySelector('link[href*="leaflet.css"]')) {
+    const leafletCSS = document.createElement('link');
+    leafletCSS.rel = 'stylesheet';
+    leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(leafletCSS);
+  }
+  
+  // Add global CSS fixes
+  const globalStyles = document.createElement('style');
+  globalStyles.textContent = `
+    /* Map fixes */
+    #map {
+      width: 100%;
+      height: 600px !important; /* Force taller map */
+      border-radius: var(--rad-m);
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: var(--shadow-s);
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* Leaflet customizations */
+    .leaflet-container {
+      background: #1e1e1e;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-2);
+      color: var(--txt-1);
+      border-radius: var(--rad-m);
+      padding: 0;
+      box-shadow: var(--shadow-s);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .leaflet-popup-tip {
+      background: var(--bg-2);
+      box-shadow: var(--shadow-s);
+    }
+    
+    .leaflet-popup-content {
+      margin: 8px;
+      width: auto !important;
+    }
+    
+    /* Form fixes */
+    #reviewForm {
+      background: var(--bg-3);
+      padding: 1.5rem;
+      border-radius: var(--rad-m);
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Make loading indicators consistent */
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(140, 103, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--ac-1);
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Improved visibility for required fields */
+    #reviewName, #reviewRating, #reviewCategory, #reviewText {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    #reviewName:required, #reviewRating:required, #reviewCategory:required, #reviewText:required {
+      border-left: 3px solid var(--ac-1);
+    }
+    
+    /* Form labels for better clarity */
+    .form-label {
+      display: block;
+      margin-bottom: 0.3rem;
+      color: var(--txt-2);
+      font-size: 0.9rem;
+    }
+  `;
+  document.head.appendChild(globalStyles);
+  
+  // Fix review form - this is the main issue you reported
+  function fixReviewForm() {
+    const reviewForm = document.getElementById('reviewForm');
+    if (!reviewForm) {
+      console.log("Review form not found");
+      return;
+    }
+    
+    console.log("Fixing review form");
+    
+    // Add labels for better clarity
+    const nameInput = document.getElementById('reviewName');
+    const ratingInput = document.getElementById('reviewRating');
+    const categoryInput = document.getElementById('reviewCategory');
+    const textInput = document.getElementById('reviewText');
+    
+    if (nameInput) {
+      const label = document.createElement('label');
+      label.className = 'form-label';
+      label.htmlFor = 'reviewName';
+      label.textContent = 'Café Name';
+      nameInput.parentNode.insertBefore(label, nameInput);
+    }
+    
+    if (ratingInput) {
+      const label = document.createElement('label');
+      label.className = 'form-label';
+      label.htmlFor = 'reviewRating';
+      label.textContent = 'Rating';
+      ratingInput.parentNode.insertBefore(label, ratingInput);
+    }
+    
+    if (categoryInput) {
+      const label = document.createElement('label');
+      label.className = 'form-label';
+      label.htmlFor = 'reviewCategory';
+      label.textContent = 'Best For';
+      categoryInput.parentNode.insertBefore(label, categoryInput);
+    }
+    
+    if (textInput) {
+      const label = document.createElement('label');
+      label.className = 'form-label';
+      label.htmlFor = 'reviewText';
+      label.textContent = 'Your Review';
+      textInput.parentNode.insertBefore(label, textInput);
+    }
+    
+    // Replace the existing submit handler with a corrected one
+    reviewForm.onsubmit = null; // Remove any existing handler
+    
+    reviewForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      console.log("Review form submitted");
+      
+      // Get form values directly
+      const name = nameInput?.value.trim() || '';
+      const rating = ratingInput?.value || '';
+      const category = categoryInput?.value || '';
+      const text = textInput?.value.trim() || '';
+      
+      console.log("Review values:", {name, rating, category, text});
+      
+      // Validation messages
+      if (!name) {
+        alert("Please enter a café name");
+        nameInput?.focus();
+        return;
+      }
+      
+      if (!rating) {
+        alert("Please select a rating");
+        ratingInput?.focus();
+        return;
+      }
+      
+      if (!category) {
+        alert("Please select a category");
+        categoryInput?.focus();
+        return;
+      }
+      
+      if (!text) {
+        alert("Please enter your review");
+        textInput?.focus();
+        return;
+      }
+      
+      // Save review to localStorage directly rather than calling other functions
+      try {
+        // Get existing reviews
+        let reviews = [];
+        try {
+          reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+        } catch (e) {
+          console.error("Error parsing existing reviews:", e);
+          reviews = [];
+        }
+        
+        // Add new review
+        reviews.push({
+          name: name,
+          rating: parseInt(rating),
+          category: category,
+          text: text,
+          date: new Date().toISOString().split('T')[0]
+        });
+        
+        // Save back to localStorage
+        localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+        console.log("Review saved successfully");
+        
+        // Reset form
+        reviewForm.reset();
+        
+        // Show success message
+        alert("Review added successfully!");
+        
+        // Refresh reviews display
+        if (typeof renderReviews === 'function') {
+          renderReviews();
+        }
+      } catch (error) {
+        console.error("Error saving review:", error);
+        alert("There was an error saving your review. Please try again.");
+      }
+    });
+    
+    console.log("Review form fixed");
+  }
+  
+  // Function to ensure Leaflet loads properly
+  function ensureLeaflet() {
+    if (typeof L === 'undefined') {
+      console.log("Leaflet not defined, loading it now");
+      
+      // Load Leaflet JS
+      const leafletScript = document.createElement('script');
+      leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      
+      // After Leaflet loads, check if the map is already initialized
+      leafletScript.onload = function() {
+        console.log("Leaflet loaded");
+        
+        // If initCafe is defined, but the map isn't showing, try calling it
+        if (typeof initCafe === 'function') {
+          setTimeout(() => {
+            const mapElement = document.getElementById('map');
+            if (mapElement && !mapElement.querySelector('.leaflet-container')) {
+              console.log("Map container exists but no Leaflet map found, initializing");
+              initCafe();
+            }
+          }, 1000);
+        }
+      };
+      
+      document.head.appendChild(leafletScript);
+    } else {
+      console.log("Leaflet is already defined");
+    }
+  }
+  
+  // Add a reload button to the map for easy recovery
+  function addMapReloadButton() {
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) return;
+    
+    // Check if button already exists
+    if (document.getElementById('map-reload-btn')) return;
+    
+    const reloadBtn = document.createElement('button');
+    reloadBtn.id = 'map-reload-btn';
+    reloadBtn.style.cssText = `
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      z-index: 999;
+      background: rgba(140, 103, 255, 0.8);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    `;
+    reloadBtn.textContent = "Reload Map";
+    reloadBtn.onclick = function() {
+      location.reload();
+    };
+    
+    mapContainer.appendChild(reloadBtn);
+  }
+  
+  // Wait for everything to load then apply our fixes
+  setTimeout(function() {
+    // Fix review form
+    fixReviewForm();
+    
+    // Ensure Leaflet is loaded
+    ensureLeaflet();
+    
+    // Add map reload button
+    addMapReloadButton();
+    
+    console.log("StudyBuddy enhancements applied");
+  }, 1000);
+});
 // Script to integrate the enhanced features
 document.addEventListener('DOMContentLoaded', function() {
   // Load additional CSS for enhanced features
