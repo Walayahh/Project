@@ -1043,574 +1043,382 @@ button:focus, input:focus, select:focus, textarea:focus {
 */
 (() => {
   "use strict";
-
-  // ────────────────────────────────────────────────────────────
-  // ⚙️  SMALL UTILITIES
-  // ────────────────────────────────────────────────────────────
-  const $  = (sel, ctx = document) => ctx.querySelector(sel);
-  const $$ = (sel, ctx = document) => ctx.querySelectorAll(sel);
-
-  /* toast ----------------------------------------------------- */
+  
+  /* ─────────────────────────────  tiny DOM helpers  ─────────────────────────── */
+  const  $ = (sel, ctx=document) => ctx.querySelector(sel),
+        $$ = (sel, ctx=document) => [...ctx.querySelectorAll(sel)];
+  
+  /* ───────────────────────────────  toast system  ───────────────────────────── */
   const toastRoot = (() => {
-    const box = document.createElement("div");
-    box.id = "toast-root";
-    box.style.cssText =
-      `position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;
-       gap:8px;max-width:320px;pointer-events:none`;
-    document.addEventListener("DOMContentLoaded", () => document.body.append(box));
-    return box;
-  })();
-
-  function toast(msg, type = "info", ms = 3000) {
     const el = document.createElement("div");
-    el.className = `sb-toast ${type}`;
-    el.style.cssText =
-      `pointer-events:auto;background:rgba(30,30,30,.92);color:#fff;padding:10px 14px;
-       border-radius:6px;font:14px/1.4 Inter,sans-serif;box-shadow:0 3px 8px rgba(0,0,0,.4);
-       border-left:4px solid var(--ac-1);animation:sb-slide-in .25s ease`;
-    el.textContent = msg;
-    toastRoot.append(el);
-    if (ms) setTimeout(() => el.remove(), ms);
+    el.id = "toast-root";
+    el.style.cssText = `
+      position:fixed;bottom:20px;right:20px;z-index:9999;
+      display:flex;flex-direction:column;gap:10px;max-width:300px;`;
+    document.addEventListener("DOMContentLoaded", () => document.body.append(el));
     return el;
+  })();
+  function toast(msg, type="info", ms=3000) {
+    const t = document.createElement("div");
+    t.className = `toast ${type}`;
+    t.innerHTML = `${msg}<span style="position:absolute;top:6px;right:10px;cursor:pointer;font-weight:bold">×</span>`;
+    t.style.cssText = `
+      padding:12px 16px;border-radius:8px;font-size:14px;color:#fff;position:relative;
+      animation:toastIn .3s ease;box-shadow:0 4px 12px rgba(0,0,0,.25);border-left:4px solid;
+    `;
+    const colors = {info:"#3498db",success:"#2ecc71",error:"#e74c3c",warning:"#f1c40f"};
+    t.style.background = colors[type]+"cc"; t.style.borderColor = colors[type];
+    t.querySelector("span").onclick = () => close();
+    toastRoot.append(t);
+    const close = () => {t.style.animation="toastOut .3s forwards";setTimeout(()=>t.remove(),300);};
+    if (ms>0) setTimeout(close, ms);
+    return t;
   }
-
-  /* localStorage helpers -------------------------------------- */
-  const LS = key => ({
-    get: def => {
-      try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(def)); }
-      catch { return def; }
-    },
-    set: val => localStorage.setItem(key, JSON.stringify(val))
-  });
-
-  // ────────────────────────────────────────────────────────────
-  // 🖼️  VANTA BACKGROUND
-  // ────────────────────────────────────────────────────────────
-  function initBackground() {
-    if (window.VANTA?.DOTS && $("#background"))
-      window.VANTA.DOTS({
-        el: "#background",
-        mouseControls: true,
-        touchControls: true,
-        minHeight: 200,
-        minWidth: 200,
-        color: 0x8c67ff,
-        color2: 0x4f46e5,
-        backgroundColor: 0x121212,
-        size: 3,
-        spacing: 25,
-        showLines: false
-      });
-  }
-
-  // ────────────────────────────────────────────────────────────
-  // 🗂️  NAVIGATION TABS
-  // ────────────────────────────────────────────────────────────
+  const styleEl = document.createElement("style"); styleEl.textContent = `
+  @keyframes toastIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes toastOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
+  .toast.info{background:#3498dbcc;border-color:#3498db}.toast.success{background:#2ecc71cc;border-color:#2ecc71}
+  .toast.error{background:#e74c3ccc;border-color:#e74c3c}.toast.warning{background:#f1c40fcc;border-color:#f1c40f}`;
+  document.head.append(styleEl);
+  
+  /* ───────────────────────────────  navigation  ────────────────────────────── */
   function initNav() {
-    $$("nav button").forEach(btn => {
-      btn.onclick = () => {
-        $("nav button.active")?.classList.remove("active");
-        btn.classList.add("active");
-        $("section.active")?.classList.remove("active");
-        $("#" + btn.dataset.target).classList.add("active");
+    $$("nav button").forEach(b=>{
+      b.onclick=()=>{ $("nav button.active").classList.remove("active");
+        b.classList.add("active");
+        $("section.active").classList.remove("active");
+        $("#"+b.dataset.target).classList.add("active");
       };
     });
   }
-
-  // ────────────────────────────────────────────────────────────
-  // 💬  QUOTES
-  // ────────────────────────────────────────────────────────────
+  
+  /* ───────────────────────────  motivational quotes  ────────────────────────── */
   function initQuotes() {
-    const list = [
-      "Start where you are.","Progress over perfection.","One step at a time.",
-      "Dream, believe, do.","Focus and win.","Every day is a second chance.",
-      "Small progress is progress.","Stay positive.","Believe you can.",
-      "Do it now.","Keep pushing.","Consistency is key.","Success is a journey.",
+    const quotes = [
+      "Start where you are.","Progress over perfection.","One step at a time.","Dream, believe, do.",
+      "Focus and win.","Every day is a second chance.","Small progress is progress.","Stay positive.",
+      "Believe you can.","Do it now.","Keep pushing.","Consistency is key.","Success is a journey.",
       "You got this.","Make today count."
     ];
-    const render = () => {
-      const box = $("#quotes"); box.innerHTML = "";
-      list.sort(() => 0.5 - Math.random()).slice(0,3).forEach(q => {
-        const div = document.createElement("div");
-        div.className = "card"; div.textContent = `"${q}"`;
-        box.append(div);
+    function render() {
+      const box=$("#quotes"); box.innerHTML="";
+      quotes.sort(()=>.5-Math.random()).slice(0,3).forEach(q=>{
+        const d=document.createElement("div");d.className="card";d.textContent=`"${q}"`;box.append(d);
       });
-    };
-    $("#refreshQuotes").onclick = render;
-    render();
+    }
+    render(); $("#refreshQuotes").onclick=render;
   }
-
-  // ────────────────────────────────────────────────────────────
-  // ⏲️  POMODORO TIMER
-  // ────────────────────────────────────────────────────────────
-  function initPomodoro() {
-    let secs = 25*60, run = false, iv;
-    const disp = $("#timerDisplay");
-    const fmt  = () => disp.textContent =
-      `${String(Math.floor(secs/60)).padStart(2,"0")}:${String(secs%60).padStart(2,"0")}`;
+  
+  /* ─────────────────────────────  Pomodoro timer  ───────────────────────────── */
+  function initPomodoro(){
+    let secs=25*60,run=false,timer;
+    const disp=$("#timerDisplay");
+    const fmt=()=>disp.textContent=`${String(Math.floor(secs/60)).padStart(2,"0")}:${String(secs%60).padStart(2,"0")}`;
     fmt();
-
-    $("#startTimer").onclick = () => {
-      if (run) return;
-      run = true;
-      iv = setInterval(() => {
-        if (secs>0) { secs--; fmt(); document.title = `(${disp.textContent}) StudyBuddy`; }
-        else { clearInterval(iv); run=false; secs=0; fmt();
-          window.confetti?.({particleCount:100,spread:70,origin:{y:.6}});
-          toast("Pomodoro complete!", "success");
-          document.title="StudyBuddy";
-        }
+    $("#startTimer").onclick=()=>{
+      if(run) return; run=true;
+      timer=setInterval(()=>{ if(secs>0){secs--;fmt();}else{clearInterval(timer);run=false;
+        confetti({particleCount:120,spread:70,origin:{y:.6}}); toast("Pomodoro done!","success");}
       },1000);
     };
-    $("#pauseTimer").onclick = () => { clearInterval(iv); run=false; };
-    $("#resetTimer").onclick = () => { clearInterval(iv); run=false; secs=25*60; fmt(); document.title="StudyBuddy"; };
+    $("#pauseTimer").onclick=()=>{clearInterval(timer);run=false;};
+    $("#resetTimer").onclick=()=>{clearInterval(timer);run=false;secs=25*60;fmt();};
   }
-
-  // ────────────────────────────────────────────────────────────
-  // ✅  TASK BOARD (To-Do / In-Progress / Done)
-  // ────────────────────────────────────────────────────────────
-  function initTasks() {
-    const store = LS("sb-tasks");
-    const statuses = ["todo","inprogress","completed"];
-
-    const render = () => {
-      const data = store.get({todo:[],inprogress:[],completed:[]});
-      statuses.forEach(st => {
-        const col = $(`.column[data-status="${st}"]`);
-        col.innerHTML = `<h3>${col.querySelector("h3").textContent}</h3>`;
-        data[st].forEach((txt,i) => {
-          const t = document.createElement("div");
-          t.className="task";
-          t.innerHTML = `
-            <span>${txt}</span>
-            <div class="task-buttons">
-              ${st==="todo"       ? `<button data-act="start" data-i="${i}" class="btn btn-small btn-primary">Start</button>`:""}
-              ${st==="inprogress" ? `<button data-act="complete" data-i="${i}" class="btn btn-small btn-primary">Done</button>`:""}
-              <button data-act="del" data-s="${st}" data-i="${i}" class="btn btn-small btn-secondary">×</button>
-            </div>`;
-          col.append(t);
+  
+  /* ─────────────────────────────  tasks / Kanban  ───────────────────────────── */
+  function initTasks(){
+    const load=()=>JSON.parse(localStorage.getItem("sb-tasks")||'{"todo":[],"inprogress":[],"completed":[]}');
+    const save=o=>localStorage.setItem("sb-tasks",JSON.stringify(o));
+    const render=()=>{
+      const data=load();
+      ["todo","inprogress","completed"].forEach(stat=>{
+        const col=$(`.column[data-status='${stat}']`); const title=col.querySelector("h3").textContent;
+        col.innerHTML=`<h3>${title}</h3>`;
+        data[stat].forEach((t,i)=>{
+          col.insertAdjacentHTML("beforeend",`
+            <div class="task"><span>${t}</span>
+              <div class="task-buttons">
+                ${stat==="todo"?`<button data-a="start" data-i="${i}" class="btn btn-small btn-primary">Start</button>`:""}
+                ${stat==="inprogress"?`<button data-a="complete" data-i="${i}" class="btn btn-small btn-primary">Complete</button>`:""}
+                <button data-a="del" data-s="${stat}" data-i="${i}" class="btn btn-small btn-secondary">×</button>
+              </div>
+            </div>`);
         });
       });
     };
-
-    $("#newTaskForm").onsubmit = e => {
-      e.preventDefault();
-      const val = $("#newTaskInput").value.trim();
-      if (!val) return;
-      const d = store.get({todo:[],inprogress:[],completed:[]});
-      d.todo.push(val); store.set(d); $("#newTaskInput").value=""; render();
+    $("#newTaskForm").onsubmit=e=>{
+      e.preventDefault();const v=$("#newTaskInput").value.trim(); if(!v) return;
+      const d=load(); d.todo.push(v); save(d); render(); e.target.reset();
     };
-
-    $("#tasksBoard").onclick = e => {
-      const btn = e.target.closest("button[data-act]");
-      if (!btn) return;
-      const d = store.get({todo:[],inprogress:[],completed:[]});
-      const i = +btn.dataset.i;
-      if (btn.dataset.act==="del") d[btn.dataset.s].splice(i,1);
-      if (btn.dataset.act==="start") d.inprogress.push(d.todo.splice(i,1)[0]);
-      if (btn.dataset.act==="complete") {
-        d.completed.push(d.inprogress.splice(i,1)[0]);
-        window.confetti?.({particleCount:100,spread:70,origin:{y:.6}});
-        $("#celebrationPopup").style.display="block";
-        setTimeout(()=>$("#celebrationPopup").style.display="none",3000);
-      }
-      store.set(d); render();
+    $("#tasksBoard").onclick=e=>{
+      const btn=e.target.closest("button[data-a]"); if(!btn) return;
+      const d=load(); const i=+btn.dataset.i;
+      if(btn.dataset.a==="del") d[btn.dataset.s].splice(i,1);
+      if(btn.dataset.a==="start"){ d.todo.splice(i,1).forEach(t=>d.inprogress.push(t));}
+      if(btn.dataset.a==="complete"){ d.inprogress.splice(i,1).forEach(t=>d.completed.push(t));
+        confetti({particleCount:100,spread:70,origin:{y:.6}});}
+      save(d); render();
     };
-
-    $("#closeCelebration").onclick = () => $("#celebrationPopup").style.display="none";
     render();
   }
-
-  // ────────────────────────────────────────────────────────────
-  // 📍  MAP (LIVE CAFÉS / LIBRARIES …)  &  REVIEWS
-  // ────────────────────────────────────────────────────────────
-  const MapMod = (() => {
-    const state = { map:null, pos:null, radius:5000, circle:null, markers:[] };
-    const TYPES={cafe:{i:"☕",c:"#8c67ff",l:"Café"},library:{i:"📚",c:"#4f46e5",l:"Library"},
-                 university:{i:"🎓",c:"#10b981",l:"Campus"},default:{i:"📍",c:"#888",l:"Spot"}};
-
-    const ensureLeaflet = async () => {
-      if (window.L) return;
-      await Promise.all([
-        new Promise(r=>{const l=document.createElement("link");l.rel="stylesheet";
-                        l.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";l.onload=r;document.head.append(l);}),
-        new Promise(r=>{const s=document.createElement("script");
-                        s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=r;document.head.append(s);})
-      ]);
-    };
-
-    const clear = () => state.markers.splice(0).forEach(m=>m.remove());
-    const makeMarker = p => {
-      const t = TYPES[p.type]||TYPES.default;
-      return L.marker([p.lat,p.lon],{
-        icon:L.divIcon({html:`<div style="background:${t.c};color:#fff;width:26px;height:26px;border-radius:50%;
-                                  display:flex;align-items:center;justify-content:center;font-size:14px;">${t.i}</div>`,
-                        className:"",iconSize:[26,26],iconAnchor:[13,13]})
-      }).bindPopup(`
-          <strong style="color:${t.c}">${p.name}</strong><br>
-          <small>${p.addr||"No address"}</small><br><br>
-          <button class="sb-add-review" data-name="${p.name.replace(/"/g,"&quot;")}">Add review</button>
-      `);
-    };
-
-    const fetchPlaces = async () => {
-      const {pos,radius}=state;
-      if(!pos) return;
-      toast(`Searching ${(radius/1000).toFixed(1)} km …`,"info",1500);
-      const q=`[out:json][timeout:25];
-        (node["amenity"~"cafe|library|college|university"](around:${radius},${pos.lat},${pos.lng});
-         node["shop"="coffee"](around:${radius},${pos.lat},${pos.lng}););out body;`;
-      try{
-        const res = await fetch("https://overpass-api.de/api/interpreter",
-          {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
-           body:"data="+encodeURIComponent(q)});
-        if(!res.ok) throw new Error(res.statusText);
-        const j = await res.json();
-        renderPlaces(j.elements||[]);
-      }catch(e){console.error(e);toast("Overpass error","error");}
-    };
-
-    const renderPlaces = els => {
-      clear();
-      if(!els.length) return toast("No study spots found","warning");
-      const dl=$("#cafeList"); dl.innerHTML="";
-      const names=new Set();
-
-      els.filter(el=>el.type==="node"&&el.tags).forEach(el=>{
-        const tg=el.tags;
-        let type="default";
-        if(tg.amenity==="cafe"||tg.shop==="coffee") type="cafe";
-        else if(tg.amenity==="library") type="library";
-        else if(["college","university"].includes(tg.amenity)) type="university";
-        const place={
-          lat:el.lat,lon:el.lon,type,
-          name:tg.name||TYPES[type].l,
-          addr:[tg["addr:housenumber"],tg["addr:street"],tg["addr:city"]].filter(Boolean).join(" ")
-        };
-        names.add(place.name);
-        const m=makeMarker(place).addTo(state.map);
-        state.markers.push(m);
-      });
-
-      [...names].sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.append(o);});
-      toast(`${state.markers.length} spots found`,"success");
-    };
-
-    const buildSlider = () => {
-      const ctl=L.control({position:"topright"});
-      ctl.onAdd=()=>{const d=L.DomUtil.create("div");
-        d.style.cssText="background:rgba(18,18,18,.85);padding:8px 10px;border-radius:6px;font:12px/1 Inter;color:#fff;";
-        d.innerHTML=`Range <input id="sb-range" type="range" min="1000" max="20000" step="1000"
-                            value="${state.radius}" style="width:120px;margin:0 6px;vertical-align:middle">
-                     <span id="sb-range-v">${state.radius/1000} km</span>`;
-        const r=d.querySelector("#sb-range"),v=d.querySelector("#sb-range-v");
-        L.DomEvent.disableClickPropagation(d);
-        r.oninput=()=>v.textContent=(r.value/1000).toFixed(1)+" km";
-        r.onchange=()=>{state.radius=+r.value; drawCircle(); fetchPlaces();};
-        return d;};
-      ctl.addTo(state.map);
-    };
-
-    const drawCircle = ()=>{
-      if(state.circle) state.circle.setLatLng(state.pos).setRadius(state.radius);
-      else state.circle=L.circle(state.pos,{radius:state.radius,color:"#8c67ff",weight:1,fillOpacity:.05}).addTo(state.map);
-    };
-
-    const init = async ()=>{
-      await ensureLeaflet();
-      const el=$("#map"); if(!el) return;
-      state.pos=await new Promise(res=>{
-        navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lng:p.coords.longitude} ),
-          ()=>res({lat:25.27699,lng:55.29625}),{timeout:4000});
-      });
-      state.map=L.map(el,{center:[state.pos.lat,state.pos.lng],zoom:14});
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(state.map);
-      L.marker([state.pos.lat,state.pos.lng]).addTo(state.map).bindPopup("You");
-      buildSlider(); drawCircle(); fetchPlaces();
-      new ResizeObserver(()=>state.map.invalidateSize()).observe(el);
-    };
-
-    /* review quick-fill button inside popup ---------------------- */
-    document.addEventListener("click",e=>{
-      const btn=e.target.closest(".sb-add-review"); if(!btn) return;
-      $("#reviewName").value = btn.dataset.name;
-      $("#reviewForm")?.scrollIntoView({behavior:"smooth"});
-      toast(`Selected ${btn.dataset.name}`,"info",1500);
-    });
-
-    return { init };
-  })();
-
-  const ReviewMod = (() => {
-    const store = LS("sb-reviews");
-
-    const render = () => {
-      const box=$("#cafeReviews"); if(!box) return;
-      const revs=store.get([]);
-      box.innerHTML="";
-      if(!revs.length){box.innerHTML='<div class="card" style="text-align:center;padding:2rem;">No reviews yet.</div>';return;}
-      revs.forEach(r=>{
-        const c=document.createElement("div");c.className="card cafe-review-card";
+  
+  /* ──────────────────────────────  cafe reviews  ────────────────────────────── */
+  function initReviews(){
+    const store={get:(def=[])=>{try{return JSON.parse(localStorage.getItem("sb-reviews")||"[]");}
+                                 catch{ return def;}},
+                 set:arr=>localStorage.setItem("sb-reviews",JSON.stringify(arr))};
+  
+    /* ------------   render all reviews  -------------- */
+    function render(){
+      const revs=store.get();
+      const wrap=$("#cafeReviews");
+      if(!wrap) return;
+      wrap.innerHTML="";
+      if(!revs.length){wrap.innerHTML=`<div class="card" style="text-align:center;padding:2rem;">
+         <div style="font-size:4rem">📝</div><p>No reviews yet</p></div>`; return;}
+      revs.forEach((r,i)=>{
+        const c=document.createElement("div"); c.className="card cafe-review-card";
         c.innerHTML=`
-          <div class="review-header">
-            <h3>${r.name}</h3><span>${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</span>
-          </div>
-          <p>${r.text}</p><small>${r.date}</small>
-          <button class="delete-review" data-id="${r.id}">×</button>`;
-        box.append(c);
+          <div class="review-header"><h3>${r.name}</h3>
+            <div>${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</div></div>
+          <p class="review-body">${r.text}</p>
+          <div class="review-footer">${r.date||""} • ${r.category}</div>
+          <button class="delete-review" data-id="${r.id||''}" data-idx="${i}"
+            style="position:absolute;top:6px;right:10px;background:none;border:none;
+            color:var(--ac-warn);font-size:20px;cursor:pointer;">×</button>`;
+        wrap.append(c);
       });
-    };
-
-    const submit = e => {
+    }
+  
+    /* ------------   delete handler (works for legacy & new)  ----------- */
+    $("#cafeReviews").addEventListener("click", e=>{
+      const btn=e.target.closest(".delete-review"); if(!btn) return;
+      const list=store.get();
+      if(btn.dataset.id){
+        store.set(list.filter(r=>r.id!==btn.dataset.id));
+      }else{ list.splice(+btn.dataset.idx,1); store.set(list);}
+      render(); toast("Review deleted","success");
+    });
+  
+    /* ------------   save-review form  ---------------- */
+    $("#reviewForm").onsubmit=e=>{
       e.preventDefault();
       const name=$("#reviewName").value.trim(),
             rating=+$("#reviewRating").value,
             cat=$("#reviewCategory").value,
             text=$("#reviewText").value.trim();
-      if(!name||!rating||!cat||!text) return toast("Please fill all fields","error");
-      const revs=store.get([]);
-      revs.push({id:Date.now().toString(36),name,rating,category:cat,text,date:new Date().toLocaleDateString()});
-      store.set(revs); render(); e.target.reset(); toast("Review saved","success");
-    };
-
-    const del = e => {
-      const btn=e.target.closest(".delete-review"); if(!btn) return;
-      store.set(store.get([]).filter(r=>r.id!==btn.dataset.id)); render(); toast("Deleted","info");
-    };
-
-    const hook = () => {
-      $("#reviewForm")?.addEventListener("submit",submit);
-      $("#cafeReviews")?.addEventListener("click",del);
-      render();
-    };
-    return { hook };
-  })();
-
-  // ────────────────────────────────────────────────────────────
-  // 🕹️  GAMES TAB
-  // ────────────────────────────────────────────────────────────
-  function initGames() {
-    const sel=$("#gameSelect"), frame=$("#gameFrame");
-    if(!sel||!frame) return;
-    const games=[
-      ["Wordle Clone","https://wordlegame.org/"],
-      ["Hangman","https://hangmanwordgame.com/"],
-      ["Flappy Bird","https://flappybird.io/"],
-      ["Minesweeper","https://kamoroso94.github.io/minesweeper/"],
-      ["Sudoku","https://sudoku.com/"],
-      ["Connect Four","https://torikul007.github.io/Connect_Four/"]
-    ];
-    games.forEach(([n,u])=>{const o=document.createElement("option");o.value=u;o.textContent=n;sel.append(o);});
-    sel.onchange=()=>{frame.src=sel.value;};
-    sel.selectedIndex=0; sel.dispatchEvent(new Event("change"));
-  }
-
-  // ────────────────────────────────────────────────────────────
-  // 🗓️  SESSIONS
-  // ────────────────────────────────────────────────────────────
-  function initSessions() {
-    const store=LS("sb-sessions");
-    const render=()=>{
-      const ul=$("#sessionList");if(!ul) return;
-      const s=store.get([]);
-      ul.innerHTML="";
-      if(!s.length){ul.innerHTML='<li class="card">No sessions yet.</li>';return;}
-      s.sort((a,b)=>new Date(b.date)-new Date(a.date));
-      s.forEach((ss,i)=>{
-        const li=document.createElement("li");li.className="card";li.style.marginBottom=".6rem";
-        li.innerHTML=`<strong>${ss.topic}</strong> ${ss.date} — ${ss.duration} min
-                      <button class="btn btn-small btn-secondary" data-i="${i}">Delete</button>`;
-        li.querySelector("button").onclick=()=>{
-          const all=store.get([]);all.splice(i,1);store.set(all);render();toast("Session deleted","info");
-        };
-        ul.append(li);
+      if(!name||!rating||!cat||!text){toast("Please fill all fields","error");return;}
+      const revs=store.get(); revs.push({
+        id:crypto.randomUUID(), name,rating,category:cat,text,
+        date:new Date().toISOString().split("T")[0]
       });
+      store.set(revs); e.target.reset(); render(); toast("Review added","success");
     };
-    $("#sessionForm")?.addEventListener("submit",e=>{
-      e.preventDefault();
-      const topic=$("#sessionTopic").value.trim(),
-            date=$("#sessionDate").value,
-            dur=+$("#sessionDuration").value;
-      if(!topic||!date||!dur) return toast("Fill all session fields","error");
-      const s=store.get([]); s.push({topic,date,duration:dur}); store.set(s); render(); e.target.reset();
-      toast("Study session added","success");
-    });
+  
     render();
   }
-
-  // ────────────────────────────────────────────────────────────
-  // 📅  PLANNER & AI STUDY-PLAN
-  // ────────────────────────────────────────────────────────────
-  function initPlanner() {
-    const store=LS("sb-plans");
-    const catEmoji={Homework:"📝",Reading:"📚",Project:"🛠️",Review:"🔍",Exam:"📊",
-                    Essay:"✍️",Presentation:"🎯",Research:"🔬",Lab:"🧪",Other:"📌"};
-
-    const render=()=>{
-      const list=$("#planList");if(!list) return;
-      const plans=store.get([]);
-      list.innerHTML="";
-      if(!plans.length){list.innerHTML='<div class="card" style="text-align:center;padding:1.5rem;">No study plans yet.</div>';return;}
+  
+  /* ───────────────────────────────  study planner  ─────────────────────────── */
+  function initPlanner(){
+    const load=()=>JSON.parse(localStorage.getItem("sb-plans")||"[]");
+    const save=p=>localStorage.setItem("sb-plans",JSON.stringify(p));
+  
+    function render(){
+      const plans=load();
+      const list=$("#planList"); list.innerHTML="";
+      if(!plans.length){list.innerHTML='<div class="card" style="text-align:center">No study plans</div>';return;}
       plans.sort((a,b)=>new Date(a.date)-new Date(b.date));
+      const emojis={Homework:"📝",Reading:"📚",Project:"🛠️",Review:"🔍",Exam:"📊",Essay:"✍️",
+                    Presentation:"🎯",Research:"🔬",Lab:"🧪",Other:"📌"};
       plans.forEach((p,i)=>{
-        const card=document.createElement("div");card.className="card";
-        const d=new Date(p.date).toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
-        card.innerHTML=`
-          <h4 style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <span style="font-size:1.4em;">${catEmoji[p.category]||"📌"}</span><span>${p.title}</span>
-          </h4>
-          <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
-            <small style="background:rgba(140,103,255,.2);padding:3px 10px;border-radius:12px;">${p.category}</small>
-            <small style="color:var(--txt-2);"><span style="margin-right:5px;">📅</span>${d}</small>
-          </div>
-          <p style="border-top:1px solid rgba(255,255,255,.1);padding-top:10px;margin-top:5px;">${p.desc||""}</p>
-          <button class="delete-plan" data-i="${i}">×</button>`;
-        card.querySelector(".delete-plan").onclick=()=>{
-          const all=store.get([]);all.splice(i,1);store.set(all);render();toast("Plan deleted","info");
-        };
-        list.append(card);
+        const d=document.createElement("div");d.className="card";
+        d.innerHTML=`
+          <h4 style="display:flex;gap:8px;align-items:center"><span style="font-size:1.3em">${emojis[p.category]||"📌"}</span>${p.title}</h4>
+          <small>${new Date(p.date).toLocaleDateString()} • ${p.category}</small>
+          <p>${p.desc||""}</p>
+          <button class="delete-plan" data-i="${i}" style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--ac-warn);font-size:20px">×</button>`;
+        list.append(d);
       });
-    };
-
-    $("#plannerForm")?.addEventListener("submit",e=>{
+    }
+    $("#plannerForm").onsubmit=e=>{
       e.preventDefault();
-      const t=$("#planTitle").value.trim(), c=$("#planCat").value, d=$("#planDate").value,
-            desc=$("#planDesc").value.trim();
-      if(!t||!c||!d) return toast("Fill all required fields","error");
-      const plans=store.get([]); plans.push({title:t,category:c,desc,date:d}); store.set(plans); render();
-      e.target.reset(); toast("Study plan added","success");
-    });
-
-    /* AI-ish plan generator ------------------------------------- */
-    $("#planStudy")?.addEventListener("click",()=>{
-      const tasks=store.get([]);
-      const out=$("#plannerAdvice");
-      if(!tasks.length) return out.innerHTML='<div style="text-align:center;padding:1rem;">Please add tasks first.</div>';
-      out.innerHTML='<div style="text-align:center;padding:1rem;">Generating …</div>';
-      const today=new Date(), fDate=today.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+      const t=$("#planTitle").value.trim(),c=$("#planCat").value,d=$("#planDate").value,desc=$("#planDesc").value.trim();
+      if(!t||!c||!d){toast("Please fill all required fields","error");return;}
+      const plans=load(); plans.push({title:t,category:c,date:d,desc}); save(plans); render(); e.target.reset();
+    };
+    $("#planList").onclick=e=>{
+      const b=e.target.closest(".delete-plan"); if(!b) return;
+      const plans=load(); plans.splice(+b.dataset.i,1); save(plans); render(); toast("Plan deleted","info");
+    };
+  
+    /* -------- generate study plan advice -------- */
+    $("#planStudy").onclick=()=>{
+      const tasks=load(); const out=$("#plannerAdvice");
+      if(!tasks.length){out.textContent="Add some tasks first.";return;}
       tasks.sort((a,b)=>new Date(a.date)-new Date(b.date));
-      tasks.forEach(t=>{
-        const due=new Date(t.date); t.days=Math.ceil((due-today)/(1000*60*60*24));
-      });
+      const today=new Date();
+      tasks.forEach(t=>t.days=Math.ceil((new Date(t.date)-today)/(864e5)));
+      let md=`# Personalized Study Plan\n\nToday is ${today.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}\n\n`;
       const group={};
       tasks.forEach(t=>{
         const k=t.days<=0?"Today":t.days===1?"Tomorrow":`In ${t.days} days`;
         (group[k]=group[k]||[]).push(t);
       });
-      let md=`# Your Personalized Study Plan\n\nToday is ${fDate}\n\n`;
-      Object.keys(group).forEach(k=>{
-        md+=`## ${k}\n\n`;
-        group[k].forEach(t=>{
-          md+=`### ${t.title} (${t.category})\n- Due: ${new Date(t.date).toLocaleDateString()}\n`;
-          if(t.desc) md+=`- ${t.desc}\n`;
-          md+=`- ⏰ Focus block: 25-min study / 5-min break\n\n`;
+      for(const k of Object.keys(group)){
+        md+=`## ${k}\n\n`;group[k].forEach(t=>{
+          md+=`### ${t.title} (${t.category})\n- Due: ${t.date}\n`;
+          md+=`- ⏰ Focus for 1-2h blocks with 5-10 min breaks\n\n`;
         });
-      });
-      md+=`## General Tips\n- Stay hydrated\n- Put phone away\n`;
-
-      /* simple markdown→HTML */
-      const lines=md.split("\n"), html=[];
-      lines.forEach(l=>{
-        if(l.startsWith("# "))      html.push(`<h1>${l.slice(2)}</h1>`);
-        else if(l.startsWith("## "))html.push(`<h2>${l.slice(3)}</h2>`);
-        else if(l.startsWith("### "))html.push(`<h3>${l.slice(4)}</h3>`);
-        else if(l.startsWith("- ")) html.push(`<li>${l.slice(2)}</li>`);
-        else html.push(`<p>${l}</p>`);
-      });
-      const wrap=document.createElement("div");
-      wrap.style.cssText="max-height:500px;overflow-y:auto;padding:20px;background:var(--bg-2);border-radius:12px;";
-      wrap.innerHTML=html.join("");
-      /* download button */
-      const dl=document.createElement("button");
-      dl.textContent="📥 Download Study Plan";
-      dl.className="btn btn-primary";
-      dl.style.display="block"; dl.style.margin="20px auto 0";
-      dl.onclick=()=>{
-        const blob=new Blob([md],{type:"text/plain"});
-        const url=URL.createObjectURL(blob);
+      }
+      /* convert to basic HTML */
+      const html=md.split("\n").map(l=>{
+        if(l.startsWith("# ")){return`<h1>${l.slice(2)}</h1>`;}
+        if(l.startsWith("## ")){return`<h2>${l.slice(3)}</h2>`;}
+        if(l.startsWith("### ")){return`<h3>${l.slice(4)}</h3>`;}
+        if(l.startsWith("- ")){return`<li>${l.slice(2)}</li>`;}
+        return `<p>${l}</p>`;
+      }).join("");
+      out.innerHTML=`<div style="max-height:400px;overflow:auto;padding:15px">${html}</div>
+        <button id="downloadPlan" class="btn btn-primary" style="margin:15px auto;display:block">📥 Download Plan</button>`;
+      $("#downloadPlan").onclick=()=>{
+        const txt=out.innerText;
+        const blob=new Blob([txt],{type:"text/plain"}); const url=URL.createObjectURL(blob);
         const a=document.createElement("a");a.href=url;a.download="StudyBuddy_Plan.txt";
-        document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
-        toast("Study plan downloaded","success");
+        document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url); toast("Plan downloaded","success");
       };
-      wrap.append(dl);
-      out.innerHTML=""; out.append(wrap);
-    });
-
+    };
+  
     render();
   }
-
-  // ────────────────────────────────────────────────────────────
-  // 💬  CHAT WIDGET (dummy / placeholder AI)
-  // ────────────────────────────────────────────────────────────
-  function initChat() {
-    const tog=$("#chatToggle"), box=$("#chatWidget"), cls=$("#chatClose"), body=$("#chatBody"), form=$("#chatInput");
-    const addMsg=(who,txt)=>{const d=document.createElement("div");d.className="row "+who;
-      d.innerHTML=`<p>${txt}</p>`;body.append(d);body.scrollTop=body.scrollHeight;};
-    tog.onclick = ()=>box.classList.toggle("open");
-    cls.onclick = ()=>box.classList.remove("open");
-    form.onsubmit=async e=>{
+  
+  /* ─────────────────────────────  study sessions  ──────────────────────────── */
+  function initSessions(){
+    const load=()=>JSON.parse(localStorage.getItem("sb-sessions")||"[]");
+    const save=s=>localStorage.setItem("sb-sessions",JSON.stringify(s));
+    function render(){
+      const ul=$("#sessionList"); const s=load(); ul.innerHTML="";
+      if(!s.length){ul.innerHTML='<li class="card">No sessions yet.</li>';return;}
+      s.sort((a,b)=>new Date(b.date)-new Date(a.date));
+      s.forEach((o,i)=>ul.insertAdjacentHTML("beforeend",`
+        <li class="card" style="margin:.4rem 0">${o.topic} — ${o.date} • ${o.duration} min
+          <button data-i="${i}" class="btn btn-small btn-secondary" style="float:right">Del</button></li>`));
+    }
+    $("#sessionForm").onsubmit=e=>{
       e.preventDefault();
-      const inp=form.querySelector("input"), text=inp.value.trim(); if(!text) return;
-      addMsg("me",text); inp.value=""; addMsg("bot","…");
-      const last=body.querySelector(".row.bot p:last-child");
-      try{
-        // replace with real API call if you have one
-        const repls=[
-          "How can I assist your studying today?","Remember 25 / 5 Pomodoro cycles!","Break topics into chunks.",
-          "Teaching someone else helps retention.","Stay hydrated and take breaks."
-        ];
-        const reply=repls[Math.floor(Math.random()*repls.length)];
-        await new Promise(r=>setTimeout(r,700));
-        last.textContent=reply;
-      }catch{last.textContent="Sorry, connection issue.";}
+      const t=$("#sessionTopic").value.trim(),d=$("#sessionDate").value,m=+$("#sessionDuration").value;
+      if(!t||!d||!m){toast("Fill all fields","error");return;}
+      const s=load(); s.push({topic:t,date:d,duration:m}); save(s); render(); e.target.reset(); toast("Session added","success");
+    };
+    $("#sessionList").onclick=e=>{
+      const i=e.target.dataset.i; if(i==null) return;
+      const s=load(); s.splice(i,1); save(s); render(); toast("Session deleted","info");
+    };
+    render();
+  }
+  
+  /* ──────────────────────────  chat widget (local AI)  ─────────────────────── */
+  function initChat(){
+    $("#chatToggle").onclick=()=>$("#chatWidget").classList.toggle("open");
+    $("#chatClose").onclick=()=>$("#chatWidget").classList.remove("open");
+    function addRow(cls,txt){$("#chatBody").insertAdjacentHTML("beforeend",`<div class="row ${cls}"><p>${txt}</p></div>`);$("#chatBody").scrollTop=$("#chatBody").scrollHeight;}
+    $("#chatInput").onsubmit=async e=>{
+      e.preventDefault();const inp=e.target.querySelector("input"); const msg=inp.value.trim(); if(!msg)return;
+      addRow("me",msg); inp.value=""; addRow("bot","…");
+      const fallback=[
+        "I'm here to help – what are you studying?","Need help organising your schedule?",
+        "Pomodoro sessions boost focus. Give them a try!","Remember to stay hydrated 🤗",
+        "Teach the concept to someone else – it really sticks.","Flashcards work great for definitions!"
+      ];
+      await new Promise(r=>setTimeout(r,800));
+      const rows=$$("#chatBody .bot p"); rows[rows.length-1].textContent=fallback[Math.floor(Math.random()*fallback.length)];
     };
   }
-
-  // ────────────────────────────────────────────────────────────
-  // ⌨️  KEYBOARD SHORTCUTS
-  // ────────────────────────────────────────────────────────────
-  function initShortcuts() {
-    document.addEventListener("keydown",e=>{
-      if(e.altKey&&e.key==="t") $("#startTimer").click();
-      if(e.altKey&&e.key==="n") $("#newTaskInput")?.focus();
-      if(e.altKey&&/^[1-5]$/.test(e.key)) $$("nav button")[e.key-1]?.click();
-    });
+  
+  /* ────────────────────────────────  games  ────────────────────────────────── */
+  function initGames(){
+    const games=[["Wordle Clone","https://wordlegame.org/"],["Hangman","https://hangmanwordgame.com/"],
+                 ["Flappy Bird","https://flappybird.io/"],["Minesweeper","https://kamoroso94.github.io/minesweeper/"],
+                 ["Sudoku","https://sudoku.com/"],["Connect Four","https://torikul007.github.io/Connect_Four/"]];
+    const sel=$("#gameSelect"); games.forEach(g=>sel.insertAdjacentHTML("beforeend",`<option value="${g[1]}">${g[0]}</option>`));
+    sel.onchange=()=>$("#gameFrame").src=sel.value; sel.selectedIndex=0; sel.dispatchEvent(new Event("change"));
   }
-
-  // ────────────────────────────────────────────────────────────
-  // 🔧  GLOBAL ERROR HANDLER (UI toast)
-  // ────────────────────────────────────────────────────────────
-  window.addEventListener("error",e=>{
-    if(e.message?.includes("ResizeObserver")) return;
-    console.error(e);
-    toast("⚠️ "+e.message,"error",5000);
+  
+  /* ──────────────────────────────  Leaflet map  ────────────────────────────── */
+  function initCafeMap(){
+    const mapEl=$("#map"); if(!mapEl) return;
+    const loadLeaflet=()=>new Promise((ok,er)=>{
+      if(window.L) return ok();
+      const js=document.createElement("script");js.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      js.onload=ok;js.onerror=er;document.head.append(js);
+      const css=document.createElement("link");css.rel="stylesheet";
+      css.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.append(css);
+    });
+    loadLeaflet().then(()=>{
+      navigator.geolocation.getCurrentPosition(got,()=>got({coords:{latitude:25.2769,longitude:55.2962}}));
+      function got(pos){
+        const {latitude:lat,longitude:lng}=pos.coords;
+        const map=L.map(mapEl,{center:[lat,lng],zoom:14}); window.leafletMap=map;
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(map);
+        L.marker([lat,lng]).addTo(map).bindPopup("You are here").openPopup();
+        const searchCircle=L.circle([lat,lng],{radius:5000,color:"#8c67ff",fillOpacity:.05}).addTo(map);
+        /* radius slider */
+        const ctl=L.control({position:"topleft"}); ctl.onAdd=()=>{
+          const c=L.DomUtil.create("div","leaflet-bar");c.style.background="rgba(30,30,30,.7)";c.style.padding="8px";
+          c.innerHTML=`<input type="range" min="1000" max="30000" step="1000" value="5000" id="radiusSlider" style="width:160px">
+            <div style="font-size:12px;color:#fff;text-align:center"><span id="radiusVal">5</span> km</div>`;
+          L.DomEvent.disableClickPropagation(c);return c;};
+        ctl.addTo(map);
+        $("#radiusSlider").oninput=e=>$("#radiusVal").textContent=(e.target.value/1000).toFixed(1);
+        $("#radiusSlider").onchange=e=>{searchCircle.setRadius(+e.target.value);fetchCafes(+e.target.value);}
+        fetchCafes(5000);
+        /* ------- fetch cafés ---------- */
+        let markers=[];
+        function clear(){markers.forEach(m=>m.remove());markers=[];}
+        function fetchCafes(rad){
+          clear(); toast("Searching cafés…","info",1500);
+          const q=`[out:json][timeout:15];
+            (node["amenity"~"cafe|library|college|university"](around:${rad},${lat},${lng});
+             node["shop"="coffee"](around:${rad},${lat},${lng});
+             node["cuisine"="coffee_shop"](around:${rad},${lat},${lng});
+             node["amenity"="restaurant"]["cuisine"~"coffee_shop|cafe"](around:${rad},${lat},${lng}););
+            out body;`;
+          fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)})
+            .then(r=>r.json()).then(d=>{
+              if(!d.elements.length) return toast("No cafés found","warning");
+              d.elements.filter(e=>e.lat&&e.lon).forEach(n=>{
+                const name=n.tags.name||"Unnamed"; const m=L.marker([n.lat,n.lon]).addTo(map)
+                  .bindPopup(`<strong>${name}</strong><br>${n.tags.amenity||n.tags.shop||''}
+                    <br><button class="btn btn-small btn-primary" onclick="selectCafeForReview('${name.replace(/'/g,"\\'")}')">Add review</button>`);
+                markers.push(m);
+              });
+              toast(`Found ${markers.length} spots`,"success");
+            }).catch(()=>toast("Overpass error","error"));
+        }
+      }
+    }).catch(()=>toast("Failed to load map","error"));
+  }
+  /* helper accessible from popup */
+  window.selectCafeForReview=name=>{$("#reviewName").value=name; $("#reviewForm").scrollIntoView({behavior:"smooth"});
+    toast(`Selected ${name} for review`,"info",2000);};
+  
+  /* ──────────────────────────────  keyboard shortcuts  ─────────────────────── */
+  document.addEventListener("keydown",e=>{
+    if(e.altKey&&e.key==="n") $("#newTaskInput")?.focus();
+    if(e.altKey&&e.key>="1"&&e.key<="5") $$("nav button")[+e.key-1]?.click();
   });
-
-  // ────────────────────────────────────────────────────────────
-  // 🏁  BOOT
-  // ────────────────────────────────────────────────────────────
+  
+  /* ───────────────────────────  one-shot initialisation  ───────────────────── */
   document.addEventListener("DOMContentLoaded",()=>{
-    initBackground();  initNav();  initQuotes(); initPomodoro();
-    initTasks();       MapMod.init(); ReviewMod.hook(); initGames();
-    initSessions();    initPlanner();initChat(); initShortcuts();
-    toast("StudyBuddy ready 🚀","success",2500);
+    if(window.VANTA?.DOTS) VANTA.DOTS({el:"#background",color:0x8c67ff,color2:0x4f46e5,backgroundColor:0x121212,
+                                        mouseControls:true,touchControls:true,showLines:false,size:3,spacing:25});
+    initNav();initQuotes();initPomodoro();initTasks();initReviews();initPlanner();
+    initSessions();initChat();initGames();initCafeMap();
+    toast("StudyBuddy loaded","success",1800);
   });
-
-  // ────────────────────────────────────────────────────────────
-  // 📜  AUTO-INJECT CSS (toast + minor bits)
-  // ────────────────────────────────────────────────────────────
-  const css=document.createElement("style");css.textContent=`
-    @keyframes sb-slide-in{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
-    .sb-toast.info    {border-color:#3498db}
-    .sb-toast.success {border-color:#2ecc71}
-    .sb-toast.error   {border-color:#e74c3c}
-    .sb-toast.warning {border-color:#f1c40f}
-    .delete-review,.delete-plan{position:absolute;top:6px;right:8px;background:none;border:none;
-                                color:#f2c94c;font-weight:bold;cursor:pointer;font-size:18px;}
-    .delete-review:hover,.delete-plan:hover{color:#ff6f91}
-    .sb-add-review{background:#8c67ff;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;}
-  `;document.head.append(css);
-})();
+  
+  /* ─────────────────────────  service-worker (optional)  ───────────────────── */
+  if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/service-worker.js").catch(()=>{}));}
+  })();
 
   </script>
   
