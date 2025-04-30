@@ -20,6 +20,9 @@
   <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js" defer></script>
 
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+e2e5Muu6h0vQ3dHZNcCD3lBl3o5j5Ko4X6F7oAEC=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-oT0ZYdIZTRZfZq6ArEeYSb/6CKjAlkKbag/1p7Zl6+M=" crossorigin="" defer></script>
+
   <style>
     :root {
       --bg-1:#121212; --bg-2:#1e1e1e; --bg-3:#2d2d2d;
@@ -156,8 +159,12 @@
       <div class="card">
         <h3>Add Café Review</h3>
         <form id="reviewForm">
-          <input id="reviewName" type="text" placeholder="Cafe name…" required/>
-          <select id="reviewRating" required><option value="">Rating…</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+          <!-- now a searchable dropdown via datalist -->
+          <input id="reviewName" list="cafeList" type="text" placeholder="Cafe name…" required/>
+          <datalist id="cafeList"></datalist>
+          <select id="reviewRating" required>
+            <option value="">Rating…</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
           <textarea id="reviewText" rows="3" placeholder="Your review…" required></textarea>
           <button class="btn btn-primary" type="submit">Save Review</button>
         </form>
@@ -391,43 +398,74 @@
 
     // CAFÉ & MAP
     function initCafe(){
-      console.log("initCafe(): injecting Google Maps");
-      const s=document.createElement('script');
-      s.src=`https://maps.googleapis.com/maps/api/js?key=${CONFIG.MAPS_API_KEY}&libraries=places`;
-      s.async=true;
-      s.onload=()=>{
-        console.log("Maps API loaded");
-        const onPos=p=>{
-          console.log("Geo success",p.coords);
-          startMap({lat:p.coords.latitude,lng:p.coords.longitude});
-        };
-        if(navigator.geolocation){
-          navigator.geolocation.getCurrentPosition(onPos,()=>{
-            console.warn("Geo fail, fallback coords");
-            startMap({lat:25.276987,lng:55.296249});
-          });
-        } else {
-          console.warn("No geo, fallback coords");
-          startMap({lat:25.276987,lng:55.296249});
-        }
-      };
-      s.onerror=e=>console.error("Maps load error",e);
-      document.head.append(s);
-
-      document.getElementById('reviewForm').addEventListener('submit',e=>{
-        e.preventDefault();
-        const arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
-        arr.push({
-          name:document.getElementById('reviewName').value,
-          rating:+document.getElementById('reviewRating').value,
-          text:document.getElementById('reviewText').value
+      console.log("initCafe(): initializing Leaflet map");
+      // wait for Leaflet script
+      document.querySelector('script[src*="leaflet.js"]').onload = () => {
+        navigator.geolocation.getCurrentPosition(function(p){
+          setupMap(p.coords.latitude, p.coords.longitude);
+        }, function(){
+          // fallback to Dubai coords
+          setupMap(25.276987, 55.296249);
         });
-        localStorage.setItem('sb-reviews',JSON.stringify(arr));
+      };
+
+      function setupMap(lat, lng) {
+        var map = L.map('map').setView([lat, lng], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // custom cafe icon
+        var cafeIcon = L.icon({
+          iconUrl: 'https://cdn-icons-png.flaticon.com/512/69/69881.png',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32]
+        });
+
+        // Overpass API to find cafes within 1500m
+        var overpassUrl = 'https://overpass-api.de/api/interpreter?data=[out:json];node["amenity"="cafe"](around:1500,' + lat + ',' + lng + ');out;';
+        fetch(overpassUrl)
+          .then(res => res.json())
+          .then(data => {
+            var cafes = data.elements || [];
+            var datalist = document.getElementById('cafeList');
+            datalist.innerHTML = '';
+            cafes.forEach(function(c) {
+              var name = (c.tags && c.tags.name) ? c.tags.name : 'Unnamed Cafe';
+              // add marker
+              var marker = L.marker([c.lat, c.lon], { icon: cafeIcon }).addTo(map);
+              marker.bindPopup('<b>' + name + '</b><br><a href="https://www.google.com/maps/dir/?api=1&destination=' + c.lat + ',' + c.lon + '" target="_blank">Get directions</a>');
+              // populate dropdown
+              if (c.tags && c.tags.name) {
+                var opt = document.createElement('option');
+                opt.value = c.tags.name;
+                datalist.appendChild(opt);
+              }
+            });
+          })
+          .catch(err => console.error('Overpass fetch error', err));
+      }
+
+      // handle review submissions (unchanged)
+      document.getElementById('reviewForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var arr = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+        arr.push({
+          name: document.getElementById('reviewName').value,
+          rating: +document.getElementById('reviewRating').value,
+          text: document.getElementById('reviewText').value
+        });
+        localStorage.setItem('sb-reviews', JSON.stringify(arr));
         renderReviews();
         e.target.reset();
       });
       renderReviews();
     }
+
+    // on DOMContentLoaded include initCafe
+    document.addEventListener('DOMContentLoaded', function() {
+      initCafe();
+    });
     function startMap(pos){
       console.log("startMap at",pos);
       const mp=new google.maps.Map(document.getElementById('map'),{center:pos,zoom:14});
