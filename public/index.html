@@ -708,21 +708,63 @@
     // CAFÉ & MAP
     function initCafe(){
       console.log("initCafe(): initializing Leaflet map");
-      // wait for Leaflet script
-      document.querySelector('script[src*="leaflet.js"]').onload = () => {
-        navigator.geolocation.getCurrentPosition(function(p){
-          setupMap(p.coords.latitude, p.coords.longitude);
-        }, function(){
-          // fallback to Dubai coords
-          setupMap(25.276987, 55.296249);
-        });
-      };
-
+      
+      // Fix: Ensure the map container is properly sized before initializing
+      const mapContainer = document.getElementById('map');
+      if(mapContainer) {
+        // Make sure the map container has a defined height
+        mapContainer.style.height = '350px';
+        mapContainer.style.width = '100%';
+      }
+      
+      // Initialize map directly, not waiting for script load (since DOMContentLoaded already ensures it's loaded)
+      try {
+        // Try to get geolocation
+        navigator.geolocation.getCurrentPosition(
+          function(p) {
+            setupMap(p.coords.latitude, p.coords.longitude);
+          }, 
+          function(error) {
+            console.log("Geolocation error:", error);
+            // fallback to Dubai coords
+            setupMap(25.276987, 55.296249);
+          },
+          { timeout: 5000 }
+        );
+      } catch(e) {
+        console.error("Map initialization error:", e);
+        // Fallback
+        setupMap(25.276987, 55.296249);
+      }
       function setupMap(lat, lng) {
-        var map = L.map('map').setView([lat, lng], 14);
+        console.log("Setting up map at coordinates:", lat, lng);
+        
+        // Force any existing map to be reinitialized
+        if(window.leafletMap) {
+          window.leafletMap.remove();
+        }
+        
+        // Create new map and store reference
+        window.leafletMap = L.map('map', {
+          zoomControl: true,
+          attributionControl: true
+        }).setView([lat, lng], 14);
+        
+        // Add tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(window.leafletMap);
+        
+        // Force map to invalidate size to ensure it renders correctly
+        setTimeout(() => {
+          window.leafletMap.invalidateSize();
+        }, 100);
+
+        // Add marker for current location
+        L.marker([lat, lng], {
+          title: 'Your Location'
+        }).addTo(window.leafletMap);
 
         // custom cafe icon
         var cafeIcon = L.icon({
@@ -736,13 +778,14 @@
         fetch(overpassUrl)
           .then(res => res.json())
           .then(data => {
+            console.log("Cafes data:", data);
             var cafes = data.elements || [];
             var datalist = document.getElementById('cafeList');
             datalist.innerHTML = '';
             cafes.forEach(function(c) {
               var name = (c.tags && c.tags.name) ? c.tags.name : 'Unnamed Cafe';
               // add marker
-              var marker = L.marker([c.lat, c.lon], { icon: cafeIcon }).addTo(map);
+              var marker = L.marker([c.lat, c.lon], { icon: cafeIcon }).addTo(window.leafletMap);
               marker.bindPopup('<b>' + name + '</b><br><a href="https://www.google.com/maps/dir/?api=1&destination=' + c.lat + ',' + c.lon + '" target="_blank">Get directions</a>');
               // populate dropdown
               if (c.tags && c.tags.name) {
@@ -754,7 +797,7 @@
           })
           .catch(err => console.error('Overpass fetch error', err));
       }
-
+      
       // handle review submissions (unchanged)
       document.getElementById('reviewForm').addEventListener('submit', function(e) {
         e.preventDefault();
