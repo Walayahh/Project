@@ -1143,213 +1143,168 @@ function initTasks(){
 }
 
 /* ════════════════ 5. Café map (original version) ══════════════════*/
-function initCafe() {
-  /* INTERNAL STATE */
-  let map, userMarker, searchCircle;
-  const markers   = [];
-  const allCafes  = [];                   // names for <datalist>
-  const cafeList  = $("#cafeList");
-  let   currentRadius = 5000;             // default 5 km
+const MapMod = (() => {
+  const state = { map:null, pos:null, radius:5000, circle:null, markers:[] };
+  const TYPES={cafe:{i:"☕",c:"#8c67ff",l:"Café"},library:{i:"📚",c:"#4f46e5",l:"Library"},
+               university:{i:"🎓",c:"#10b981",l:"Campus"},default:{i:"📍",c:"#888",l:"Spot"}};
 
-  /* 1.  LOAD LEAFLET IF NOT PRESENT */
-  const loadLeaflet = () => new Promise(res => {
-    if (window.L) return res();
-    const js  = document.createElement("script");
-    js.src    = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    js.onload = res;
-    document.head.append(js);
+  const ensureLeaflet = async () => {
+    if (window.L) return;
+    await Promise.all([
+      new Promise(r=>{const l=document.createElement("link");l.rel="stylesheet";
+                      l.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";l.onload=r;document.head.append(l);}),
+      new Promise(r=>{const s=document.createElement("script");
+                      s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=r;document.head.append(s);})
+    ]);
+  };
+
+  const clear = () => state.markers.splice(0).forEach(m=>m.remove());
+  const makeMarker = p => {
+    const t = TYPES[p.type]||TYPES.default;
+    return L.marker([p.lat,p.lon],{
+      icon:L.divIcon({html:`<div style="background:${t.c};color:#fff;width:26px;height:26px;border-radius:50%;
+                                display:flex;align-items:center;justify-content:center;font-size:14px;">${t.i}</div>`,
+                      className:"",iconSize:[26,26],iconAnchor:[13,13]})
+    }).bindPopup(`
+        <strong style="color:${t.c}">${p.name}</strong><br>
+        <small>${p.addr||"No address"}</small><br><br>
+        <button class="sb-add-review" data-name="${p.name.replace(/"/g,"&quot;")}">Add review</button>
+    `);
+  };
+
+  const fetchPlaces = async () => {
+    const {pos,radius}=state;
+    if(!pos) return;
+    toast(`Searching ${(radius/1000).toFixed(1)} km …`,"info",1500);
+    const q=`[out:json][timeout:25];
+      (node["amenity"~"cafe|library|college|university"](around:${radius},${pos.lat},${pos.lng});
+       node["shop"="coffee"](around:${radius},${pos.lat},${pos.lng}););out body;`;
+    try{
+      const res = await fetch("https://overpass-api.de/api/interpreter",
+        {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+         body:"data="+encodeURIComponent(q)});
+      if(!res.ok) throw new Error(res.statusText);
+      const j = await res.json();
+      renderPlaces(j.elements||[]);
+    }catch(e){console.error(e);toast("Overpass error","error");}
+  };
+
+  const renderPlaces = els => {
+    clear();
+    if(!els.length) return toast("No study spots found","warning");
+    const dl=$("#cafeList"); dl.innerHTML="";
+    const names=new Set();
+
+    els.filter(el=>el.type==="node"&&el.tags).forEach(el=>{
+      const tg=el.tags;
+      let type="default";
+      if(tg.amenity==="cafe"||tg.shop==="coffee") type="cafe";
+      else if(tg.amenity==="library") type="library";
+      else if(["college","university"].includes(tg.amenity)) type="university";
+      const place={
+        lat:el.lat,lon:el.lon,type,
+        name:tg.name||TYPES[type].l,
+        addr:[tg["addr:housenumber"],tg["addr:street"],tg["addr:city"]].filter(Boolean).join(" ")
+      };
+      names.add(place.name);
+      const m=makeMarker(place).addTo(state.map);
+      state.markers.push(m);
+    });
+
+    [...names].sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.append(o);});
+    toast(`${state.markers.length} spots found`,"success");
+  };
+
+  const buildSlider = () => {
+    const ctl=L.control({position:"topright"});
+    ctl.onAdd=()=>{const d=L.DomUtil.create("div");
+      d.style.cssText="background:rgba(18,18,18,.85);padding:8px 10px;border-radius:6px;font:12px/1 Inter;color:#fff;";
+      d.innerHTML=`Range <input id="sb-range" type="range" min="1000" max="20000" step="1000"
+                          value="${state.radius}" style="width:120px;margin:0 6px;vertical-align:middle">
+                   <span id="sb-range-v">${state.radius/1000} km</span>`;
+      const r=d.querySelector("#sb-range"),v=d.querySelector("#sb-range-v");
+      L.DomEvent.disableClickPropagation(d);
+      r.oninput=()=>v.textContent=(r.value/1000).toFixed(1)+" km";
+      r.onchange=()=>{state.radius=+r.value; drawCircle(); fetchPlaces();};
+      return d;};
+    ctl.addTo(state.map);
+  };
+
+  const drawCircle = ()=>{
+    if(state.circle) state.circle.setLatLng(state.pos).setRadius(state.radius);
+    else state.circle=L.circle(state.pos,{radius:state.radius,color:"#8c67ff",weight:1,fillOpacity:.05}).addTo(state.map);
+  };
+
+  const init = async ()=>{
+    await ensureLeaflet();
+    const el=$("#map"); if(!el) return;
+    state.pos=await new Promise(res=>{
+      navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lng:p.coords.longitude} ),
+        ()=>res({lat:25.27699,lng:55.29625}),{timeout:4000});
+    });
+    state.map=L.map(el,{center:[state.pos.lat,state.pos.lng],zoom:14});
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(state.map);
+    L.marker([state.pos.lat,state.pos.lng]).addTo(state.map).bindPopup("You");
+    buildSlider(); drawCircle(); fetchPlaces();
+    new ResizeObserver(()=>state.map.invalidateSize()).observe(el);
+  };
+
+  /* review quick-fill button inside popup ---------------------- */
+  document.addEventListener("click",e=>{
+    const btn=e.target.closest(".sb-add-review"); if(!btn) return;
+    $("#reviewName").value = btn.dataset.name;
+    $("#reviewForm")?.scrollIntoView({behavior:"smooth"});
+    toast(`Selected ${btn.dataset.name}`,"info",1500);
   });
 
-  /* 2.  USER LOCATION WITH GRACEFUL FALLBACK */
-  const getUserLoc = () => new Promise(resolve => {
-    navigator.geolocation?.getCurrentPosition(
-      p => resolve([p.coords.latitude, p.coords.longitude]),
-      () => resolve([25.276987, 55.296249]),   // Dubai fallback
-      { timeout: 6000 }
-    );
-  });
+  return { init };
+})();
 
-  /* 3.  INITIALISE MAP */
-  (async () => {
-    await loadLeaflet();
-    const [lat, lng] = await getUserLoc();
+const ReviewMod = (() => {
+  const store = LS("sb-reviews");
 
-    // Build map
-    map = L.map("map", { zoomControl: true }).setView([lat, lng], 14);
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      { attribution: "&copy; OpenStreetMap", maxZoom: 19 }
-    ).addTo(map);
-
-    /* user marker + radius circle */
-    userMarker   = L.marker([lat, lng], { title: "You" })
-                   .addTo(map).bindPopup("Your location").openPopup();
-    searchCircle = L.circle([lat, lng], {
-      radius: currentRadius,
-      color: "#8c67ff", fillColor: "#8c67ff", fillOpacity: 0.05, weight: 1
-    }).addTo(map);
-
-    /* radius slider */
-    addRadiusControl();
-
-    /* refresh button */
-    addRefreshBtn();
-
-    /* first load */
-    fetchCafes(lat, lng, currentRadius);
-  })();
-
-  /* 4.  RADIUS CONTROL */
-  function addRadiusControl() {
-    const Radius = L.Control.extend({
-      options: { position: "topleft" },
-      onAdd() {
-        const c = L.DomUtil.create("div", "leaflet-control");
-        c.style.cssText =
-          "background:rgba(30,30,30,.85);padding:10px;border-radius:6px;color:#fff";
-        c.innerHTML = `
-          <label style="font-size:12px;color:#b0b0b0">Search radius</label>
-          <input type="range" id="radiusSlider" min="1000" max="20000"
-                 step="1000" value="${currentRadius}" style="width:180px">
-          <div id="radiusVal" style="text-align:center;font-size:12px;margin-top:4px">
-            ${(currentRadius / 1000).toFixed(1)} km
-          </div>`;
-        L.DomEvent.disableClickPropagation(c);
-        setTimeout(() => {          // attach events after insertion
-          $("#radiusSlider", c).oninput  = e => {
-            currentRadius = +e.target.value;
-            $("#radiusVal", c).textContent =
-              (currentRadius / 1000).toFixed(1) + " km";
-            searchCircle.setRadius(currentRadius);
-          };
-          $("#radiusSlider", c).onchange = () =>
-            fetchCafes(userMarker.getLatLng().lat,
-                       userMarker.getLatLng().lng,
-                       currentRadius);
-        }, 0);
-        return c;
-      }
+  const render = () => {
+    const box=$("#cafeReviews"); if(!box) return;
+    const revs=store.get([]);
+    box.innerHTML="";
+    if(!revs.length){box.innerHTML='<div class="card" style="text-align:center;padding:2rem;">No reviews yet.</div>';return;}
+    revs.forEach(r=>{
+      const c=document.createElement("div");c.className="card cafe-review-card";
+      c.innerHTML=`
+        <div class="review-header">
+          <h3>${r.name}</h3><span>${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</span>
+        </div>
+        <p>${r.text}</p><small>${r.date}</small>
+        <button class="delete-review" data-id="${r.id}">×</button>`;
+      box.append(c);
     });
-    map.addControl(new Radius());
-  }
+  };
 
-  /* 5.  REFRESH BUTTON */
-  function addRefreshBtn() {
-    const Refresh = L.Control.extend({
-      options: { position: "bottomright" },
-      onAdd() {
-        const c = L.DomUtil.create("div", "leaflet-bar");
-        const a = L.DomUtil.create("a", "", c);
-        a.innerHTML = "↻";
-        a.style.cssText = "font-weight:bold;font-size:18px;line-height:26px";
-        a.href="#";
-        a.title="Refresh";
-        a.onclick = e => {
-          e.preventDefault();
-          fetchCafes(userMarker.getLatLng().lat,
-                     userMarker.getLatLng().lng,
-                     currentRadius);
-        };
-        return c;
-      }
-    });
-    map.addControl(new Refresh());
-  }
+  const submit = e => {
+    e.preventDefault();
+    const name=$("#reviewName").value.trim(),
+          rating=+$("#reviewRating").value,
+          cat=$("#reviewCategory").value,
+          text=$("#reviewText").value.trim();
+    if(!name||!rating||!cat||!text) return toast("Please fill all fields","error");
+    const revs=store.get([]);
+    revs.push({id:Date.now().toString(36),name,rating,category:cat,text,date:new Date().toLocaleDateString()});
+    store.set(revs); render(); e.target.reset(); toast("Review saved","success");
+  };
 
-  /* 6.  FETCH CAFÉS VIA OVERPASS */
-  function fetchCafes(lat, lng, radius) {
-    clearMarkers();
-    toast(`Finding study spots within ${(radius / 1000).toFixed(1)} km…`, "info", 1200);
+  const del = e => {
+    const btn=e.target.closest(".delete-review"); if(!btn) return;
+    store.set(store.get([]).filter(r=>r.id!==btn.dataset.id)); render(); toast("Deleted","info");
+  };
 
-    const query = `
-    [out:json][timeout:12];
-      ( node["amenity"="cafe"](around:${radius},${lat},${lng});
-        node["shop"="coffee"](around:${radius},${lat},${lng});
-        node["amenity"="library"](around:${radius},${lat},${lng});
-      ); out body;`;
+  const hook = () => {
+    $("#reviewForm")?.addEventListener("submit",submit);
+    $("#cafeReviews")?.addEventListener("click",del);
+    render();
+  };
+  return { hook };
+})();
 
-    fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: "data=" + encodeURIComponent(query)
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (!data.elements?.length) {
-          toast("No cafés found – try a larger radius", "warning");
-          return;
-        }
-        processCafes(data.elements);
-        toast(`Found ${data.elements.length} places`, "success");
-      })
-      .catch(err => {
-        console.error(err);
-        toast("Error loading café data", "error");
-      });
-  }
-
-  /* 7.  HANDLE & RENDER CAFÉ RESULTS */
-  function processCafes(nodes) {
-    const style = {
-      cafe:  { icon:"☕", color:"#ff9f43", label:"Café" },
-      coffee:{ icon:"☕", color:"#ff9f43", label:"Coffee Shop" },
-      library:{icon:"📚", color:"#4f46e5", label:"Library" },
-      other:  { icon:"📍", color:"#8c67ff", label:"Spot" }
-    };
-
-    nodes.forEach(n => {
-      const type =
-        n.tags.amenity === "cafe"   ? "cafe"   :
-        n.tags.shop    === "coffee" ? "coffee" :
-        n.tags.amenity === "library"? "library": "other";
-
-      const meta = style[type];
-      const name = n.tags.name || `${meta.label} #${n.id.toString().slice(-4)}`;
-
-      // marker with coloured icon
-      const marker = L.marker([n.lat, n.lon], {
-        icon: L.divIcon({
-          html:`<div style="background:${meta.color};
-                      width:26px;height:26px;border-radius:50%;
-                      display:flex;align-items:center;justify-content:center;
-                      color:#000;font-size:15px">${meta.icon}</div>`,
-          className:"", iconSize:[26,26], iconAnchor:[13,13]
-        })
-      }).addTo(map);
-
-      marker.bindPopup(`
-        <div style="width:220px">
-          <h3 style="margin:0 0 6px;color:${meta.color}">${name}</h3>
-          <button style="width:100%;background:${meta.color};
-                         border:none;color:#fff;padding:6px;border-radius:4px;
-                         cursor:pointer"
-                  onclick="selectCafeForReview('${name.replace(/'/g,"\\'")}')">
-            Add review
-          </button>
-        </div>`);
-
-      markers.push(marker);
-      allCafes.push({ name });
-    });
-
-    updateCafeList();
-  }
-
-  /* 8.  HELPERS */
-  function clearMarkers() {
-    markers.forEach(m => m.remove());
-    markers.length = 0;
-    allCafes.length = 0;
-  }
-  function updateCafeList() {
-    cafeList.innerHTML = "";         // datalist options
-    [...new Set(allCafes.map(c => c.name))]
-      .sort()
-      .forEach(n => cafeList.insertAdjacentHTML("beforeend", `<option value="${n}">`));
-  }
-
-  /* 9.  RE-DRAW ON RESIZE (fixes “jitter”) */
-  window.addEventListener("resize", () => map?.invalidateSize());
-}
 /* ════════════════ 6. Reviews (CRUD with delete-fix) ═══════════════*/
 function initReviews(){
   const key="sb-reviews";
