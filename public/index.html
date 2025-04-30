@@ -1260,51 +1260,6 @@ const MapMod = (() => {
   return { init };
 })();
 
-const ReviewMod = (() => {
-  const store = LS("sb-reviews");
-
-  const render = () => {
-    const box=$("#cafeReviews"); if(!box) return;
-    const revs=store.get([]);
-    box.innerHTML="";
-    if(!revs.length){box.innerHTML='<div class="card" style="text-align:center;padding:2rem;">No reviews yet.</div>';return;}
-    revs.forEach(r=>{
-      const c=document.createElement("div");c.className="card cafe-review-card";
-      c.innerHTML=`
-        <div class="review-header">
-          <h3>${r.name}</h3><span>${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</span>
-        </div>
-        <p>${r.text}</p><small>${r.date}</small>
-        <button class="delete-review" data-id="${r.id}">×</button>`;
-      box.append(c);
-    });
-  };
-
-  const submit = e => {
-    e.preventDefault();
-    const name=$("#reviewName").value.trim(),
-          rating=+$("#reviewRating").value,
-          cat=$("#reviewCategory").value,
-          text=$("#reviewText").value.trim();
-    if(!name||!rating||!cat||!text) return toast("Please fill all fields","error");
-    const revs=store.get([]);
-    revs.push({id:Date.now().toString(36),name,rating,category:cat,text,date:new Date().toLocaleDateString()});
-    store.set(revs); render(); e.target.reset(); toast("Review saved","success");
-  };
-
-  const del = e => {
-    const btn=e.target.closest(".delete-review"); if(!btn) return;
-    store.set(store.get([]).filter(r=>r.id!==btn.dataset.id)); render(); toast("Deleted","info");
-  };
-
-  const hook = () => {
-    $("#reviewForm")?.addEventListener("submit",submit);
-    $("#cafeReviews")?.addEventListener("click",del);
-    render();
-  };
-  return { hook };
-})();
-
 /* ════════════════ 6. Reviews (CRUD with delete-fix) ═══════════════*/
 function initReviews(){
   const key="sb-reviews";
@@ -1495,7 +1450,7 @@ function initChat(){
 document.addEventListener("DOMContentLoaded",()=>{
   document.body.append(toastRoot);
   initNav();   initQuotes(); initPomodoro(); initTasks();
-  initCafe();  initReviews(); initGames();   initSessions();
+  MapMod.init();  initReviews(); initGames();   initSessions();
   initPlanner(); initChat();
 
   /* background dots (Vanta) */
