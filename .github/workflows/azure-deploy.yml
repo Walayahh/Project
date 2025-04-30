@@ -1,30 +1,40 @@
 name: Deploy to Azure Web App
-
 on:
   push:
-    branches:
-      - main  # Set this to your default branch
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '16.x'
-    
-    - name: npm install and build
-      run: |
-        npm install
-    
-    - name: 'Deploy to Azure Web App'
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'YOUR-APP-NAME'  # Replace with your Azure Web App name
-        slot-name: 'production'
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: .
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      # — create an .env from your secrets —
+      - name: Create .env from secrets
+        run: |
+          cat <<EOF > .env
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+          MAPS_API_KEY=${{ secrets.MAPS_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          SHEETS_ID=${{ secrets.SHEETS_ID }}
+          EOF
+
+      - name: npm install
+        run: npm ci
+
+     # - name: Build (if you have a build step)
+    # .   run: npm run build   # or remove if you don't have one
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'StudyBuddy11'             # ← replace!
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
