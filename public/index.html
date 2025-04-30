@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>StudyBuddy</title>
 
-  <!-- Google API loader -->
+  <!-- Original Google API loader -->
   <script src="https://apis.google.com/js/api.js" defer></script>
 
   <!-- Google Fonts -->
@@ -20,12 +20,16 @@
   <!-- Confetti -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js" defer></script>
 
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  defer
+></script>
 
   <style>
-    /* ---------------- VARIABLES & RESET ---------------- */
     :root {
       --bg-1:#121212; --bg-2:#1e1e1e; --bg-3:#2d2d2d;
       --txt-1:#fafafa; --txt-2:#b0b0b0;
@@ -34,227 +38,512 @@
       --shadow-s:0 4px 20px rgba(0,0,0,.15);
       --shadow-l:0 8px 30px rgba(0,0,0,.35);
     }
-    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; font-family:'Inter',sans-serif; }
-    body { background:var(--bg-1); color:var(--txt-1); min-height:100vh; display:flex; flex-direction:column; overflow-x:hidden; }
-    a { color:var(--ac-1); text-decoration:none; transition:all .2s ease; }
-    a:hover { text-decoration:underline; }
-
-    /* ---------------- HEADER & NAV ---------------- */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif;}
+    body{background:var(--bg-1);color:var(--txt-1);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;}
+    a{color:var(--ac-1);text-decoration:none;transition:all .2s ease;}a:hover{text-decoration:underline;}
+    #background{position:fixed;inset:0;z-index:-1;}
+    header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:rgba(30,30,30,.85);backdrop-filter:blur(10px);box-shadow:var(--shadow-s);z-index:10;}
+    .logo-container{display:flex;align-items:center;gap:.6rem;}
+    .logo-icon{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--ac-1),var(--ac-2));display:grid;place-content:center;color:#fff;font-weight:700;}
+    .logo{font-size:1.5rem;font-weight:700;background:linear-gradient(90deg,var(--ac-1),var(--ac-3));-webkit-background-clip:text;color:transparent;}
+    nav{display:flex;gap:.3rem;flex-wrap:wrap;}
+    nav button{background:none;border:none;color:var(--txt-2);padding:.55rem .95rem;border-radius:var(--rad-s);cursor:pointer;transition:all .2s ease;position:relative;}
+    nav button:hover, nav button.active{background:rgba(140,103,255,.12);color:var(--txt-1);}
+    nav button.active::after{content:'';position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:22px;height:3px;background:var(--ac-1);border-radius:5px;}
+    main{flex:1;max-width:1400px;margin:0 auto;padding:2rem;}
+    section{display:none;animation:fade .35s ease-in-out;}section.active{display:block;}
+    @keyframes fade{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+    h2.section-title{font-size:1.75rem;margin-bottom:1.4rem;}
+    .card{background:var(--bg-2);padding:1.25rem;border-radius:var(--rad-m);box-shadow:var(--shadow-s);border:1px solid rgba(255,255,255,.05);transition:all .3s ease;position:relative;}
+    .card:hover{transform:translateY(-4px);box-shadow:var(--shadow-l);}
+    .btn{display:inline-flex;align-items:center;gap:.45rem;border:none;cursor:pointer;padding:.7rem 1.4rem;font-weight:500;border-radius:var(--rad-s);box-shadow:0 2px 6px rgba(0,0,0,.2);transition:all .2s ease;}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,.3);}
+    .btn-primary{background:var(--ac-1);color:#fff;} .btn-secondary{background:rgba(255,255,255,.1);color:var(--txt-1);} .btn-small{padding:.3rem .6rem;font-size:.8rem;}
+    input,textarea,select{background:var(--bg-3);border:1px solid rgba(255,255,255,.1);color:var(--txt-1);padding:.75rem;border-radius:var(--rad-s);width:100%;margin-bottom:1rem;transition:border-color .2s ease;}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac-1);}
+    /* Quotes */
+    #quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem;}
+    #quotes .card{font-style:italic;text-align:center;color:var(--txt-2);}
+    /* Pomodoro */
+    #timerDisplay{font-size:2.5rem;text-align:center;margin:1rem 0;}
+    #timerControls{display:flex;justify-content:center;gap:1rem;}
+    /* Tasks */
+    #tasksBoard{display:flex;gap:1rem;margin-top:1rem;}
+    .column{background:var(--bg-2);flex:1;min-width:240px;padding:1rem;border-radius:var(--rad-m);position:relative;}
+    .column h3{margin-bottom:.8rem;color:var(--txt-2);}
+    .task{background:var(--bg-3);padding:.6rem 1rem;border-radius:var(--rad-s);margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;}
+    .task-buttons button{margin-left:.5rem;}
+    /* Map */
+    #map{width:100%;height:350px;border-radius:var(--rad-m);margin-bottom:1rem;}
+    /* Reviews */
+    .delete-review{position:absolute;top:4px;right:8px;cursor:pointer;color:var(--ac-warn);font-weight:bold;}
+    .delete-review:hover{color:var(--ac-3);}
+    /* Games */
+    #gameSelect{margin-bottom:1rem;}
+    /* Make iframe much bigger */
+    #gameFrame{width:100%;height:80vh;border:none;border-radius:var(--rad-m);margin-top:1rem;box-shadow:var(--shadow-s);}
+    /* Planner */
+    #planList .card{margin-bottom:1rem;padding-right:2.5rem;}
+    #plannerAdvice{margin-top:1rem;background:var(--bg-3);padding:1rem;border-radius:var(--rad-s);max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;}
+    .delete-plan{position:absolute;top:10px;right:10px;cursor:pointer;color:var(--ac-warn);font-weight:bold;font-size:1.2rem;}
+    .delete-plan:hover{color:var(--ac-3);}
+    /* Chat */
+    #chatToggle{position:fixed;bottom:1rem;right:1rem;width:56px;height:56px;border-radius:50%;background:var(--ac-1);color:#fff;font-size:1.5rem;border:none;cursor:pointer;box-shadow:var(--shadow-l);z-index:20;transition:transform 0.3s ease,box-shadow 0.3s ease;}
+    #chatToggle:hover{transform:scale(1.1);box-shadow:0 10px 40px rgba(140,103,255,.4);}
+    #chatWidget{position:fixed;bottom:1.5rem;right:1.5rem;width:340px;height:400px;background:var(--bg-2);border-radius:var(--rad-l);box-shadow:var(--shadow-l);display:flex;flex-direction:column;overflow:hidden;z-index:20;opacity:0;transform:translateY(20px) scale(0.8);pointer-events:none;transition:opacity .3s ease,transform .3s ease;}
+    #chatWidget.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all;}
+    #chatHeader{background:linear-gradient(135deg,var(--ac-1),var(--ac-2));color:#fff;padding:1rem;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:var(--rad-l);border-top-right-radius:var(--rad-l);}
+    #chatClose{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;transition:transform .2s ease;}
+    #chatClose:hover{transform:rotate(90deg);}
+    #chatBody{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.7rem;scroll-behavior:smooth;background:rgba(18,18,18,.3);}
+    .row{display:flex;}
+    .row.me{justify-content:flex-end;}
+    .row p{padding:.75rem 1rem;border-radius:18px;max-width:80%;font-size:.88rem;line-height:1.5;}
+    .me p{background:linear-gradient(135deg,var(--ac-1),var(--ac-2));color:#fff;border-bottom-right-radius:6px;}
+    .bot p{background:var(--bg-3);color:var(--txt-1);border-bottom-left-radius:6px;}
+    #chatInput{display:flex;border-top:1px solid rgba(255,255,255,.06);}
+    #chatInput input{flex:1;border:none;background:var(--bg-3);color:var(--txt-1);padding:.75rem 1rem;border-radius:var(--rad-s);margin:.5rem;outline:none;}
+    #chatInput button{width:42px;height:42px;margin:.5rem;border-radius:50%;background:var(--ac-1);border:none;color:#fff;transition:all .2s ease;cursor:pointer;}
+    #chatInput button:hover{transform:scale(1.1);background:var(--ac-2);}
+    /* Celebration */
+    #celebrationPopup{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,var(--ac-1),var(--ac-2));color:#fff;padding:2rem;border-radius:var(--rad-l);text-align:center;z-index:100;box-shadow:var(--shadow-l);animation:popIn .5s cubic-bezier(.175,.885,.32,1.275) forwards;}
+    #celebrationPopup .emoji{font-size:4rem;margin-bottom:1rem;display:block;}
+    #celebrationPopup h2{font-size:2rem;margin-bottom:1rem;}
+    #celebrationPopup button{margin-top:1rem;background:rgba(255,255,255,.2);border:none;color:#fff;padding:.5rem 1.5rem;border-radius:var(--rad-s);cursor:pointer;transition:all .2s ease;}
+    #celebrationPopup button:hover{background:rgba(255,255,255,.3);}
+    @keyframes popIn{0%{transform:translate(-50%,-50%) scale(.8);opacity:0;}100%{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+    :root {
+      --bg-1: #121212;
+      --bg-2: #1e1e1e;
+      --bg-3: #2d2d2d;
+      --txt-1: #fafafa;
+      --txt-2: #b0b0b0;
+      --ac-1: #8c67ff;
+      --ac-2: #4f46e5;
+      --ac-3: #ff6f91;
+      --ac-warn: #f2c94c;
+      --rad-s: 6px;
+      --rad-m: 12px;
+      --rad-l: 20px;
+      --shadow-s: 0 4px 20px rgba(0, 0, 0, .15);
+      --shadow-l: 0 8px 30px rgba(0, 0, 0, .35);
+    }
+  
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+  
+    body {
+      background: var(--bg-1);
+      color: var(--txt-1);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+  
+    a {
+      color: var(--ac-1);
+      text-decoration: none;
+      transition: all .2s ease;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  
+    #background {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+    }
+  
     header {
-      position:sticky; top:0; display:flex; align-items:center; justify-content:space-between;
-      padding:1rem 2rem; background:rgba(30,30,30,.85); backdrop-filter:blur(10px);
-      box-shadow:var(--shadow-s); z-index:10;
+      position: sticky;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(30, 30, 30, .85);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow-s);
+      z-index: 10;
     }
-    .logo-container { display:flex; align-items:center; gap:.6rem; }
+  
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+  
     .logo-icon {
-      width:34px; height:34px; border-radius:8px;
-      background:linear-gradient(135deg,var(--ac-1),var(--ac-2));
-      display:grid; place-content:center; color:#fff; font-weight:700;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--ac-1), var(--ac-2));
+      display: grid;
+      place-content: center;
+      color: #fff;
+      font-weight: 700;
     }
+  
     .logo {
-      font-size:1.5rem; font-weight:700;
-      background:linear-gradient(90deg,var(--ac-1),var(--ac-3));
-      -webkit-background-clip:text; color:transparent;
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--ac-1), var(--ac-3));
+      -webkit-background-clip: text;
+      color: transparent;
     }
-    nav { display:flex; gap:.3rem; flex-wrap:wrap; }
+  
+    nav {
+      display: flex;
+      gap: .3rem;
+      flex-wrap: wrap;
+    }
+  
     nav button {
-      background:none; border:none; color:var(--txt-2);
-      padding:.55rem .95rem; border-radius:var(--rad-s);
-      cursor:pointer; transition:all .2s ease; position:relative;
+      background: none;
+      border: none;
+      color: var(--txt-2);
+      padding: .55rem .95rem;
+      border-radius: var(--rad-s);
+      cursor: pointer;
+      transition: all .2s ease;
+      position: relative;
     }
-    nav button:hover, nav button.active {
-      background:rgba(140,103,255,.12); color:var(--txt-1);
+    nav button:hover,
+    nav button.active {
+      background: rgba(140, 103, 255, .12);
+      color: var(--txt-1);
+    }
+    #map {
+      width: 100%;
+      height: 500px;
+      border-radius: var(--rad-m);
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: var(--shadow-s);
+    }
+  
+    /* Improved cafe review styling */
+    #reviewForm {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+  
+    #reviewForm textarea {
+      grid-column: span 2;
+    }
+  
+    #reviewForm button {
+      margin-top: 0.5rem;
+    }
+  
+    /* Search input styling */
+    .search-control input {
+      background: var(--bg-3);
+      color: var(--txt-1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.6rem;
+      border-radius: var(--rad-s);
+      width: 220px;
+      box-shadow: var(--shadow-s);
+      margin-bottom: 0 !important;
+    }
+  
+    .search-control input:focus {
+      outline: none;
+      border-color: var(--ac-1);
+    }
+  
+    /* Loading indicator */
+    .loading-indicator span {
+      background: rgba(30, 30, 30, 0.8);
+      color: var(--txt-1);
+      padding: 8px 12px;
+      border-radius: var(--rad-s);
+      font-size: 0.9rem;
+      display: inline-block;
+      box-shadow: var(--shadow-s);
+    }
+  
+    /* Marker cluster styling */
+    .marker-cluster {
+      background-color: rgba(140, 103, 255, 0.6);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+  
+    /* Leaflet popup styling */
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-2);
+      color: var(--txt-1);
+      border-radius: var(--rad-m);
+      padding: 0.5rem;
+      box-shadow: var(--shadow-s);
+    }
+  
+    .leaflet-popup-tip {
+      background: var(--bg-2);
+    }
+  
+    .leaflet-popup-content {
+      margin: 0.5rem;
+    }
+  
+    /* Enhanced review form */
+    #cafeReviews {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+  
+    .cafe-review-card {
+      background: var(--bg-2);
+      border-radius: var(--rad-m);
+      padding: 1rem;
+      box-shadow: var(--shadow-s);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+  
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+  
+    .review-body {
+      margin-bottom: 0.5rem;
+    }
+  
+    .review-footer {
+      font-size: 0.8rem;
+      color: var(--txt-2);
+    }
+    
+    /* DataList enhancement */
+    #reviewName {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255, 255, 255, 0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'%3E%3C/path%3E%3Ccircle cx='12' cy='10' r='3'%3E%3C/circle%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 10px center;
+      padding-left: 2.5rem;
     }
     nav button.active::after {
-      content:''; position:absolute; left:50%; bottom:0;
-      transform:translateX(-50%); width:22px; height:3px;
-      background:var(--ac-1); border-radius:5px;
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      width: 22px;
+      height: 3px;
+      background: var(--ac-1);
+      border-radius: 5px;
     }
-
-    /* ---------------- MAIN & SECTIONS ---------------- */
-    main { flex:1; max-width:1400px; margin:0 auto; padding:2rem; }
-    section { display:none; animation:fade .35s ease-in-out; }
-    section.active { display:block; }
+  
+    main {
+      flex: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+  
+    section {
+      display: none;
+      animation: fade .35s ease-in-out;
+    }
+    section.active {
+      display: block;
+    }
+  
     @keyframes fade {
-      from { opacity:0; transform:translateY(12px); }
-      to   { opacity:1; transform:translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    h2.section-title { font-size:1.75rem; margin-bottom:1.4rem; }
-
-    /* ---------------- CARDS & BUTTONS ---------------- */
+  
+    h2.section-title {
+      font-size: 1.75rem;
+      margin-bottom: 1.4rem;
+    }
+  
     .card {
-      background:var(--bg-2); padding:1.25rem; border-radius:var(--rad-m);
-      box-shadow:var(--shadow-s); border:1px solid rgba(255,255,255,.05);
-      transition:all .3s ease; position:relative;
+      background: var(--bg-2);
+      padding: 1.25rem;
+      border-radius: var(--rad-m);
+      box-shadow: var(--shadow-s);
+      border: 1px solid rgba(255, 255, 255, .05);
+      transition: all .3s ease;
+      position: relative;
     }
-    .card:hover { transform:translateY(-4px); box-shadow:var(--shadow-l); }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-l);
+    }
+  
+    /* Buttons */
     .btn {
-      display:inline-flex; align-items:center; gap:.45rem;
-      border:none; cursor:pointer; padding:.7rem 1.4rem; font-weight:500;
-      border-radius:var(--rad-s); box-shadow:0 2px 6px rgba(0,0,0,.2);
-      transition:all .2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      border: none;
+      cursor: pointer;
+      padding: .7rem 1.4rem;
+      font-weight: 500;
+      border-radius: var(--rad-s);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+      transition: all .2s ease;
     }
-    .btn:hover { transform:translateY(-2px); box-shadow:0 4px 8px rgba(0,0,0,.3); }
-    .btn-primary { background:var(--ac-1); color:#fff; }
-    .btn-secondary { background:rgba(255,255,255,.1); color:var(--txt-1); }
-    .btn-small { padding:.3rem .6rem; font-size:.8rem; }
-
-    /* ---------------- INPUTS ---------------- */
-    input, textarea, select {
-      background:var(--bg-3); border:1px solid rgba(255,255,255,.1);
-      color:var(--txt-1); padding:.75rem; border-radius:var(--rad-s);
-      width:100%; margin-bottom:1rem; transition:border-color .2s ease;
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, .3);
     }
-    input:focus, textarea:focus, select:focus {
-      outline:none; border-color:var(--ac-1);
+  
+    .btn-primary {
+      background: var(--ac-1);
+      color: #fff;
     }
-
-    /* ---------------- DASHBOARD ---------------- */
+    .btn-secondary {
+      background: rgba(255, 255, 255, .1);
+      color: var(--txt-1);
+    }
+    .btn-small {
+      padding: .3rem .6rem;
+      font-size: .8rem;
+    }
+  
+    /* Inputs */
+    input,
+    textarea,
+    select {
+      background: var(--bg-3);
+      border: 1px solid rgba(255, 255, 255, .1);
+      color: var(--txt-1);
+      padding: .75rem;
+      border-radius: var(--rad-s);
+      width: 100%;
+      margin-bottom: 1rem;
+      transition: border-color .2s ease;
+    }
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--ac-1);
+    }
+  
+    /* Quotes */
     #quotes {
-      display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-      gap:1rem; margin-bottom:1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
     }
-    #quotes .card { font-style:italic; text-align:center; color:var(--txt-2); }
-    #timerDisplay { font-size:2.5rem; text-align:center; margin:1rem 0; }
-    #timerControls { display:flex; justify-content:center; gap:1rem; }
-
-    /* ---------------- TASKS ---------------- */
-    #tasksBoard { display:flex; gap:1rem; margin-top:1rem; }
-    .column { background:var(--bg-2); flex:1; min-width:240px; padding:1rem; border-radius:var(--rad-m); }
-    .column h3 { margin-bottom:.8rem; color:var(--txt-2); }
+    #quotes .card {
+      font-style: italic;
+      text-align: center;
+      color: var(--txt-2);
+    }
+  
+    /* Pomodoro Timer */
+    #timerDisplay {
+      font-size: 2.5rem;
+      text-align: center;
+      margin: 1rem 0;
+    }
+    #timerControls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+  
+    /* Tasks Board */
+    #tasksBoard {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .column {
+      background: var(--bg-2);
+      flex: 1;
+      min-width: 240px;
+      padding: 1rem;
+      border-radius: var(--rad-m);
+      position: relative;
+    }
+    .column h3 {
+      margin-bottom: .8rem;
+      color: var(--txt-2);
+    }
     .task {
-      background:var(--bg-3); padding:.6rem 1rem; border-radius:var(--rad-s);
-      margin-bottom:.6rem; display:flex; align-items:center; justify-content:space-between;
+      background: var(--bg-3);
+      padding: .6rem 1rem;
+      border-radius: var(--rad-s);
+      margin-bottom: .6rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .task-buttons button { margin-left:.5rem; }
-
-    /* ---------------- CAFÉS ---------------- */
+    .task-buttons button {
+      margin-left: .5rem;
+    }
+  
+    /* Map (Leaflet) */
     #map {
-      width:100%; height:400px; border-radius:var(--rad-m);
-      margin-bottom:1rem; box-shadow:var(--shadow-s); border:1px solid rgba(255,255,255,.1);
+      width: 100%;
+      height: 350px;
+      border-radius: var(--rad-m);
+      margin-bottom: 1rem;
     }
-    #reviewForm {
-      display:grid; grid-template-columns:1fr 1fr; gap:1rem;
-    }
-    #reviewForm textarea { grid-column:span 2; }
-    #cafeReviews {
-      display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem;
-      margin-top:1rem;
-    }
+  
+    /* Reviews */
     .delete-review {
-      position:absolute; top:4px; right:8px; cursor:pointer;
-      color:var(--ac-warn); font-weight:bold;
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      cursor: pointer;
+      color: var(--ac-warn);
+      font-weight: bold;
     }
-    .delete-review:hover { color:var(--ac-3); }
-
-    /* ---------------- GAMES ---------------- */
-    #gameSelect { margin-bottom:1rem; }
+    .delete-review:hover {
+      color: var(--ac-3);
+    }
+  
+    /* Games */
+    #gameSelect {
+      margin-bottom: 1rem;
+    }
     #gameFrame {
-      width:100%; height:80vh; border:none; border-radius:var(--rad-m);
-      margin-top:1rem; box-shadow:var(--shadow-s);
-    }
-
-    /* ---------------- SESSIONS ---------------- */
-    .grid.two-col { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; }
-    #sessionList { list-style:none; margin-top:1rem; }
-    #sessionList li.card {
-      background:var(--bg-2); padding:.8rem; margin-bottom:.6rem;
-      display:flex; justify-content:space-between; border-radius:var(--rad-m);
-    }
-
-    /* ---------------- PLANNER ---------------- */
-    #planList .card { margin-bottom:1rem; padding-right:2.5rem; }
-    .delete-plan {
-      position:absolute; top:10px; right:10px; cursor:pointer;
-      color:var(--ac-warn); font-weight:bold; font-size:1.2rem;
-    }
-    .delete-plan:hover { color:var(--ac-3); }
-    #plannerAdvice {
-      margin-top:1rem; background:var(--bg-3); padding:1rem; border-radius:var(--rad-s);
-      max-height:300px; overflow-y:auto; white-space:pre-wrap; line-height:1.5;
-    }
-
-    /* ---------------- CHAT ---------------- */
-    #chatToggle {
-      position:fixed; bottom:1rem; right:1rem; width:56px; height:56px;
-      border-radius:50%; background:var(--ac-1); color:#fff; font-size:1.5rem;
-      border:none; cursor:pointer; box-shadow:var(--shadow-l); z-index:20;
-      transition:transform .3s ease,box-shadow .3s ease;
-    }
-    #chatToggle:hover {
-      transform:scale(1.1); box-shadow:0 10px 40px rgba(140,103,255,.4);
-    }
-    #chatWidget {
-      position:fixed; bottom:1.5rem; right:1.5rem; width:340px; height:400px;
-      background:var(--bg-2); border-radius:var(--rad-l); box-shadow:var(--shadow-l);
-      display:flex; flex-direction:column; overflow:hidden; z-index:20;
-      opacity:0; transform:translateY(20px) scale(0.8); pointer-events:none;
-      transition:opacity .3s ease,transform .3s ease;
-    }
-    #chatWidget.open {
-      opacity:1; transform:translateY(0) scale(1); pointer-events:all;
-    }
-    #chatHeader {
-      background:linear-gradient(135deg,var(--ac-1),var(--ac-2));
-      color:#fff; padding:1rem; display:flex; justify-content:space-between; align-items:center;
-      border-top-left-radius:var(--rad-l); border-top-right-radius:var(--rad-l);
-    }
-    #chatClose { background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer; }
-    #chatClose:hover { transform:rotate(90deg); }
-    #chatBody {
-      flex:1; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:.7rem;
-      background:rgba(18,18,18,.3); scroll-behavior:smooth;
-    }
-    .row { display:flex; }
-    .row.me { justify-content:flex-end; }
-    .row p {
-      padding:.75rem 1rem; border-radius:18px; max-width:80%; font-size:.88rem; line-height:1.5;
-    }
-    .me p {
-      background:linear-gradient(135deg,var(--ac-1),var(--ac-2)); color:#fff;
-      border-bottom-right-radius:6px;
-    }
-    .bot p {
-      background:var(--bg-3); color:var(--txt-1); border-bottom-left-radius:6px;
-    }
-    #chatInput {
-      display:flex; border-top:1px solid rgba(255,255,255,.06);
-    }
-    #chatInput input {
-      flex:1; border:none; background:var(--bg-3); color:var(--txt-1);
-      padding:.75rem 1rem; border-radius:var(--rad-s); margin:.5rem; outline:none;
-    }
-    #chatInput button {
-      width:42px; height:42px; margin:.5rem; border-radius:50%;
-      background:var(--ac-1); border:none; color:#fff; transition:all .2s ease; cursor:pointer;
-    }
-    #chatInput button:hover { transform:scale(1.1); background:var(--ac-2); }
-
-    /* ---------------- CELEBRATION ---------------- */
-    #celebrationPopup {
-      display:none; position:fixed; top:50%; left:50%;
-      transform:translate(-50%,-50%);
-      background:linear-gradient(135deg,var(--ac-1),var(--ac-2));
-      color:#fff; padding:2rem; border-radius:var(--rad-l); text-align:center;
-      z-index:100; box-shadow:var(--shadow-l);
-      animation:popIn .5s cubic-bezier(.175,.885,.32,1.275) forwards;
-    }
-    #celebrationPopup .emoji { font-size:4rem; margin-bottom:1rem; display:block; }
-    @keyframes popIn {
-      0% { transform:translate(-50%,-50%) scale(.8); opacity:0; }
-      100% { transform:translate(-50%,-50%) scale(1); opacity:1; }
+      width: 100%;
+      height: 80vh;
+      border: none;
+      border-radius: var(--rad-m);
+      margin-top: 1rem;
+      box-shadow: var(--shadow-s);
     }
   </style>
 </head>
-
 <body>
   <div id="background"></div>
-
   <header>
-    <div class="logo-container">
-      <div class="logo-icon">S</div>
-      <span class="logo">StudyBuddy</span>
-    </div>
+    <div class="logo-container"><div class="logo-icon">S</div><span class="logo">StudyBuddy</span></div>
     <nav>
       <button class="active" data-target="dashboard">Dashboard</button>
       <button data-target="cafes">Cafés</button>
@@ -265,11 +554,12 @@
   </header>
 
   <main>
-    <!-- DASHBOARD -->
+    <!-- Dashboard -->
     <section id="dashboard" class="active">
       <h2 class="section-title">Dashboard</h2>
       <div id="quotes"></div>
       <button id="refreshQuotes" class="btn btn-small btn-primary">Refresh Quotes</button>
+
       <div class="card">
         <h3>Pomodoro Timer</h3>
         <div id="timerDisplay">25:00</div>
@@ -279,10 +569,11 @@
           <button id="resetTimer" class="btn btn-secondary">Reset</button>
         </div>
       </div>
+
       <div class="card">
         <h3>Tasks</h3>
         <form id="newTaskForm">
-          <input id="newTaskInput" type="text" placeholder="New task…" required/>
+          <input id="newTaskInput" type="text" placeholder="New task… (Enter or click Add)" required/>
           <button type="submit" class="btn btn-primary btn-small">Add</button>
         </form>
         <div id="tasksBoard">
@@ -293,34 +584,50 @@
       </div>
     </section>
 
-    <!-- CAFÉS -->
-    <section id="cafes">
-      <h2 class="section-title">Nearby Cafés</h2>
-      <div id="map"></div>
-      <div class="card">
-        <h3>Add Café Review</h3>
-        <form id="reviewForm">
-          <input id="reviewName" list="cafeList" type="text" placeholder="Choose café…" required/>
-          <datalist id="cafeList"></datalist>
-          <select id="reviewRating" required>
-            <option value="">Rating…</option>
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-          </select>
-          <textarea id="reviewText" rows="3" placeholder="Your review…" required></textarea>
-          <button type="submit" class="btn btn-primary">Save Review</button>
-        </form>
+    <!-- Cafés -->
+<!-- Cafés -->
+<section id="cafes">
+  <h2 class="section-title">Study Cafés</h2>
+  <div id="map"></div>
+  
+  <div class="card">
+    <h3>Add Café Review</h3>
+    <form id="reviewForm">
+      <div style="position: relative; grid-column: span 2;">
+        <input id="reviewName" list="cafeList" type="text" placeholder="Choose a cafe or type a name..." required/>
+        <datalist id="cafeList"></datalist>
       </div>
-      <div id="cafeReviews"></div>
-    </section>
-
-    <!-- GAMES -->
+      <select id="reviewRating" required>
+        <option value="">Select Rating...</option>
+        <option value="1">★ (Poor)</option>
+        <option value="2">★★ (Fair)</option>
+        <option value="3">★★★ (Good)</option>
+        <option value="4">★★★★ (Very Good)</option>
+        <option value="5">★★★★★ (Excellent)</option>
+      </select>
+      <select id="reviewCategory" required>
+        <option value="">Best For...</option>
+        <option value="studying">Studying</option>
+        <option value="reading">Reading</option>
+        <option value="meetings">Meetings</option>
+        <option value="relaxing">Relaxing</option>
+        <option value="food">Food & Drinks</option>
+      </select>
+      <textarea id="reviewText" rows="3" placeholder="Share your experience... Were the tables good for studying? How was the WiFi? Was it quiet?" required></textarea>
+      <button class="btn btn-primary" type="submit">Save Review</button>
+    </form>
+  </div>
+  
+  <div id="cafeReviews"></div>
+</section>
+    <!-- Games -->
     <section id="games">
       <h2 class="section-title">Take a Break</h2>
       <select id="gameSelect"></select>
       <iframe id="gameFrame"></iframe>
     </section>
 
-    <!-- SESSIONS -->
+    <!-- Sessions -->
     <section id="sessions">
       <h2 class="section-title">Study Sessions</h2>
       <div class="card">
@@ -329,24 +636,21 @@
           <div><label>Topic</label><input id="sessionTopic" type="text" required/></div>
           <div><label>Date</label><input id="sessionDate" type="date" required/></div>
           <div><label>Duration</label><input id="sessionDuration" type="number" required/></div>
-          <div style="grid-column:1/-1;">
-            <button class="btn btn-primary" type="submit">Add</button>
-          </div>
+          <div style="grid-column:1/-1;"><button class="btn btn-primary" type="submit">Add</button></div>
         </form>
       </div>
       <ul id="sessionList"></ul>
     </section>
 
-    <!-- PLANNER -->
+    <!-- Planner -->
     <section id="planner">
       <h2 class="section-title">Study Planner</h2>
       <div class="card">
         <h3>Add Planner Task</h3>
         <form id="plannerForm">
-          <input id="planTitle" placeholder="Title…" required style="width:48%;display:inline-block;margin-right:2%;"/>
+          <input id="planTitle" type="text" placeholder="Title…" required style="width:48%;display:inline-block;margin-right:2%;"/>
           <select id="planCat" style="width:48%;display:inline-block;" required>
-            <option value="">Category…</option>
-            <option>Homework</option><option>Reading</option><option>Project</option><option>Review</option>
+            <option value="">Category…</option><option>Homework</option><option>Reading</option><option>Project</option><option>Review</option>
           </select>
           <textarea id="planDesc" rows="2" placeholder="Description…"></textarea>
           <input id="planDate" type="date" required/>
@@ -359,7 +663,7 @@
     </section>
   </main>
 
-  <!-- CHAT TOGGLE & WIDGET -->
+  <!-- Chat -->
   <button id="chatToggle">💬</button>
   <div id="chatWidget">
     <div id="chatHeader">
@@ -373,7 +677,7 @@
     </form>
   </div>
 
-  <!-- CELEBRATION POPUP -->
+  <!-- Celebration -->
   <div id="celebrationPopup">
     <span class="emoji">🎉</span>
     <h2>Great Job!</h2>
@@ -382,33 +686,28 @@
   </div>
 
   <script>
-    // CONFIG FETCH (if you need external API keys)
     let CONFIG = {};
     async function fetchConfig(){
-      try { CONFIG = await (await fetch('/api/config')).json(); }
-      catch(e){ console.warn('Config fetch failed', e); }
+      try {
+        console.log("Fetching config…");
+        CONFIG = await (await fetch('/api/config')).json();
+        console.log("CONFIG:", CONFIG);
+      } catch(e){
+        console.error("Config fetch failed", e);
+      }
     }
 
-    // ON DOM READY
     document.addEventListener('DOMContentLoaded', async ()=>{
       VANTA.DOTS({
         el:'#background',
-        mouseControls:true, touchControls:true, gyroControls:false,
-        minHeight:200, minWidth:200, scale:1, scaleMobile:1,
-        color:0x8c67ff, color2:0x4f46e5, backgroundColor:0x121212,
-        size:3, spacing:25, showLines:false
+        mouseControls:true,touchControls:true,gyroControls:false,
+        minHeight:200,minWidth:200,scale:1,scaleMobile:1,
+        color:0x8c67ff,color2:0x4f46e5,backgroundColor:0x121212,
+        size:3,spacing:25,showLines:false
       });
       await fetchConfig();
-
-      initNav();
-      initQuotes();
-      initPomodoro();
-      initTasks();
-      initCafe();
-      initGames();
-      initSessions();
-      initPlanner();
-      initChat();
+      initNav(); initQuotes(); initPomodoro(); initTasks();
+      initCafe(); initGames(); initSessions(); initPlanner(); initChat();
     });
 
     // NAV
@@ -424,20 +723,11 @@
     }
 
     // QUOTES
-    const quotesList=[
-      "Start where you are.","Progress over perfection.","One step at a time.",
-      "Dream, believe, do.","Focus and win.","Every day is a second chance.",
-      "Small progress is progress.","Stay positive.","Believe you can.","Do it now.",
-      "Keep pushing.","Consistency is key.","Success is a journey.","You got this.","Make today count."
-    ];
+    const quotesList = ["Start where you are.","Progress over perfection.","One step at a time.","Dream, believe, do.","Focus and win.","Every day is a second chance.","Small progress is progress.","Stay positive.","Believe you can.","Do it now.","Keep pushing.","Consistency is key.","Success is a journey.","You got this.","Make today count."];
     function renderQuotes(){
-      const c=document.getElementById('quotes');
-      c.innerHTML='';
+      const c=document.getElementById('quotes');c.innerHTML='';
       quotesList.sort(()=>0.5-Math.random()).slice(0,3).forEach(q=>{
-        const d=document.createElement('div');
-        d.className='card';
-        d.textContent=`"${q}"`;
-        c.append(d);
+        const d=document.createElement('div');d.className='card';d.textContent=`"${q}"`;c.append(d);
       });
     }
     function initQuotes(){
@@ -459,42 +749,38 @@
         if(pomRunning) return;
         pomRunning=true;
         pomInterval=setInterval(()=>{
-          if(pomTime>0) { pomTime--; updatePom(); }
-          else {
-            clearInterval(pomInterval);
-            pomRunning=false;
-            confetti({particleCount:100,spread:70,origin:{y:0.6}});
-            alert('Done!');
-            document.title='StudyBuddy';
-          }
+          if(pomTime>0){pomTime--;updatePom();}
+          else{clearInterval(pomInterval);pomRunning=false;confetti({particleCount:100,spread:70,origin:{y:0.6}});alert('Done!');document.title='StudyBuddy';}
         },1000);
       };
-      document.getElementById('pauseTimer').onclick=()=>{
-        clearInterval(pomInterval);
-        pomRunning=false;
-      };
-      document.getElementById('resetTimer').onclick=()=>{
-        clearInterval(pomInterval);
-        pomRunning=false;
-        pomTime=25*60;
-        updatePom();
-      };
+      document.getElementById('pauseTimer').onclick=()=>{clearInterval(pomInterval);pomRunning=false;};
+      document.getElementById('resetTimer').onclick=()=>{clearInterval(pomInterval);pomRunning=false;pomTime=25*60;updatePom();};
     }
 
     // TASKS
     function getTasks(){
       let raw;
       try{ raw=JSON.parse(localStorage.getItem('sb-tasks')); }
-      catch{ raw=null; }
-      if(Array.isArray(raw)) return {todo:raw,inprogress:[],completed:[]};
-      if(raw && typeof raw==='object') return {
-        todo:Array.isArray(raw.todo)?raw.todo:[],
-        inprogress:Array.isArray(raw.inprogress)?raw.inprogress:[],
-        completed:Array.isArray(raw.completed)?raw.completed:[]
-      };
-      return {todo:[],inprogress:[],completed:[]};
+      catch(e){ raw=null; console.warn("Invalid tasks data",e); }
+      let t;
+      if(Array.isArray(raw)){
+        console.log("Legacy task-array found, migrating");
+        t={todo:raw, inprogress:[], completed:[]};
+      } else if(raw && typeof raw==='object'){
+        t=raw;
+      } else {
+        t={todo:[],inprogress:[],completed:[]};
+      }
+      t.todo  = Array.isArray(t.todo) ? t.todo : [];
+      t.inprogress = Array.isArray(t.inprogress) ? t.inprogress : [];
+      t.completed  = Array.isArray(t.completed) ? t.completed : [];
+      console.log("Loaded tasks:", t);
+      return t;
     }
-    function saveTasks(t){ localStorage.setItem('sb-tasks',JSON.stringify(t)); }
+    function saveTasks(t){
+      console.log("Saving tasks:", t);
+      localStorage.setItem('sb-tasks',JSON.stringify(t));
+    }
     function renderTasks(){
       const all=getTasks();
       ['todo','inprogress','completed'].forEach(status=>{
@@ -502,8 +788,7 @@
         const title=col.querySelector('h3').textContent;
         col.innerHTML=`<h3>${title}</h3>`;
         all[status].forEach((txt,i)=>{
-          const task=document.createElement('div');
-          task.className='task';
+          const task=document.createElement('div');task.className='task';
           task.innerHTML=`
             <span>${txt}</span>
             <div class="task-buttons">
@@ -517,9 +802,11 @@
       });
     }
     function initTasks(){
+      console.log("initTasks()");
       document.getElementById('newTaskForm').addEventListener('submit',e=>{
         e.preventDefault();
         const v=document.getElementById('newTaskInput').value.trim();
+        console.log("Adding task:",v);
         if(!v) return;
         const all=getTasks();
         all.todo.push(v);
@@ -530,8 +817,12 @@
       document.getElementById('tasksBoard').addEventListener('click',e=>{
         const btn=e.target.closest('button[data-action]');
         if(!btn) return;
-        const all=getTasks(), action=btn.dataset.action;
-        if(action==='delete') all[btn.dataset.status].splice(+btn.dataset.index,1);
+        const action=btn.dataset.action;
+        const all=getTasks();
+        console.log("Task action:",action,btn.dataset);
+        if(action==='delete'){
+          all[btn.dataset.status].splice(+btn.dataset.index,1);
+        }
         if(action==='start'){
           const [t]=all.todo.splice(+btn.dataset.index,1);
           all.inprogress.push(t);
@@ -546,120 +837,659 @@
         saveTasks(all);
         renderTasks();
       });
+      renderTasks();
       document.getElementById('closeCelebration').onclick=()=>{
         document.getElementById('celebrationPopup').style.display='none';
       };
-      renderTasks();
     }
-
-    // CAFÉ & MAP
-    function initCafe(){
-      const mapEl=document.getElementById('map'),
-            listEl=document.getElementById('cafeList'),
-            reviewForm=document.getElementById('reviewForm');
-
-      document.querySelector('script[src*="leaflet.js"]').onload=()=>{
-        navigator.geolocation.getCurrentPosition(pos=>{
-          setupMap(pos.coords.latitude,pos.coords.longitude);
-        },()=>{
-          setupMap(25.276987,55.296249);
-        });
-      };
-
-      function setupMap(lat,lng){
-        const map=L.map(mapEl).setView([lat,lng],14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-          attribution:'© OpenStreetMap contributors'
-        }).addTo(map);
-
-        const cafeIcon=L.icon({
-          iconUrl:'https://cdn-icons-png.flaticon.com/512/69/69881.png',
-          iconSize:[32,32], iconAnchor:[16,32]
-        });
-
-        const url=`https://overpass-api.de/api/interpreter?data=[out:json];node["amenity"="cafe"](around:1500,${lat},${lng});out;`;
-        fetch(url)
-          .then(r=>r.json())
-          .then(data=>{
-            data.elements.forEach(c=>{
-              const name=c.tags?.name||'Unnamed Café';
-              L.marker([c.lat,c.lon],{icon:cafeIcon})
-                .addTo(map)
-                .bindPopup(`
-                  <b>${name}</b><br>
-                  <a href="https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}" target="_blank">
-                    Get directions
-                  </a>
-                `);
-              if(c.tags?.name){
-                const opt=document.createElement('option');
-                opt.value=c.tags.name;
-                listEl.appendChild(opt);
-              }
-            });
-          })
-          .catch(console.error);
-
-        reviewForm.addEventListener('submit',e=>{
-          e.preventDefault();
-          const arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
-          arr.push({
-            name:document.getElementById('reviewName').value,
-            rating:+document.getElementById('reviewRating').value,
-            text:document.getElementById('reviewText').value
-          });
-          localStorage.setItem('sb-reviews',JSON.stringify(arr));
-          renderReviews();
-          e.target.reset();
-        });
-        renderReviews();
+    
+  
+    // on DOMContentLoaded include initCafe
+    document.addEventListener('DOMContentLoaded', function() {
+      initCafe();
+    });
+    function startMap(pos){
+      console.log("startMap at",pos);
+      const mp=new google.maps.Map(document.getElementById('map'),{center:pos,zoom:14});
+      new google.maps.Marker({map:mp,position:pos,title:'You'});
+      const svc=new google.maps.places.PlacesService(mp);
+      svc.nearbySearch({location:pos,radius:1500,type:['cafe']},(res,st)=>{
+        console.log("PlacesService:",st,res);
+        if(st==='OK')res.forEach(p=>new google.maps.Marker({map:mp,position:p.geometry.location,title:p.name}));
+      });
+    }
+// Replace the entire initCafe function with this improved version
+function initCafe() {
+  console.log("Initializing enhanced cafe map functionality");
+  
+  // Cache DOM elements
+  const mapContainer = document.getElementById('map');
+  const cafeList = document.getElementById('cafeList');
+  const reviewForm = document.getElementById('reviewForm');
+  const reviewName = document.getElementById('reviewName');
+  
+  // Map globals
+  let map, markerCluster;
+  let cafeMarkers = [];
+  let allCafes = [];
+  
+  // Initialize map - with debounce for resize events to improve performance
+  function initializeMap() {
+    console.log("Initializing map container");
+    
+    // Clear any existing map to prevent memory leaks
+    if (window.leafletMap) {
+      window.leafletMap.remove();
+      window.leafletMap = null;
+    }
+    
+    // Make sure map container exists
+    if (!mapContainer) {
+      console.error("Map container not found!");
+      return;
+    }
+    
+    // Set fixed height for better stability
+    mapContainer.style.height = '500px';
+    
+    // Get user location with better error handling
+    navigator.geolocation.getCurrentPosition(
+      position => setupMap(position.coords.latitude, position.coords.longitude),
+      error => {
+        console.warn("Geolocation failed:", error);
+        // Fallback coordinates - Dubai
+        setupMap(25.276987, 55.296249);
+      },
+      { timeout: 10000, enableHighAccuracy: false } // Use less accurate geolocation for better performance
+    );
+  }
+  
+  // Set up the map with performance improvements
+  function setupMap(lat, lng) {
+    console.log("Setting up map at:", lat, lng);
+    
+    // Use specific performance options for Leaflet
+    const mapOptions = {
+      center: [lat, lng],
+      zoom: 14,
+      zoomControl: true,
+      attributionControl: false,
+      minZoom: 10,
+      maxZoom: 19,
+      preferCanvas: true, // Use Canvas rendering for better performance
+      renderer: L.canvas(), // Force canvas renderer
+      fadeAnimation: false, // Disable animations for better performance
+      markerZoomAnimation: false, // Disable marker zoom animations
+      zoomAnimation: window.innerWidth > 768, // Only enable zoom animation on desktop
+      tap: false // Disable tap handler for better performance
+    };
+    
+    // Initialize the map with performance options
+    map = L.map('map', mapOptions);
+    window.leafletMap = map;
+    
+    // Add a lightweight tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+      maxNativeZoom: 18, // Limit native zoom level for better performance
+      tileSize: 512, // Use larger tiles for better performance
+      zoomOffset: -1
+    }).addTo(map);
+    
+    // Add attribution in a better position
+    L.control.attribution({
+      position: 'bottomright'
+    }).addTo(map);
+    
+    // Add user location marker with simpler styling
+    let userMarker = L.marker([lat, lng], {
+      title: 'Your Location',
+      icon: L.divIcon({
+        html: `<div style="background-color:#4f46e5;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,0.3);">📍</div>`,
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+    }).addTo(map);
+    
+    // Add a lighter circle for better performance
+    let locationCircle = L.circle([lat, lng], {
+      radius: 1500,
+      color: '#8c67ff',
+      fillColor: '#8c67ff',
+      fillOpacity: 0.05,
+      opacity: 0.2,
+      weight: 1 // Thinner line for better performance
+    }).addTo(map);
+    
+    // Add cafe markers from simulated data for demo purposes
+    addSimulatedCafes(lat, lng, 15);
+    
+    // Add search control
+    addSearchControl();
+    
+    // Force a resize to ensure proper rendering
+    setTimeout(() => {
+      map.invalidateSize();
+      
+      // Add a debounced resize handler for better performance
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => map.invalidateSize(), 100);
+      });
+    }, 100);
+  }
+  
+  // Add simulated cafes with improved styling and interactions
+  function addSimulatedCafes(centerLat, centerLng, count) {
+    // Show loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'map-loading';
+    loadingDiv.innerHTML = '<div style="background:rgba(0,0,0,0.7);color:white;padding:8px 12px;border-radius:4px;font-size:14px;position:absolute;top:10px;right:10px;z-index:1000;">Loading cafes...</div>';
+    mapContainer.appendChild(loadingDiv);
+    
+    // Generate cafe data
+    const cafeNames = [
+      'Brew Haven', 'Coffee Culture', 'The Daily Grind', 'Espresso Express',
+      'Bean & Gone', 'The Roasted Bean', 'Caffeine Fix', 'Latte Lounge',
+      'The Coffee House', 'Java Junction', 'Mocha Magic', 'Study Cafe',
+      'Focus Brew', 'The Book Cafe', 'Student Corner', 'Academic Cafe'
+    ];
+    
+    // Use setTimeout to prevent blocking the UI
+    setTimeout(() => {
+      // Create a batch of cafes for better performance
+      for (let i = 0; i < count; i++) {
+        // Generate position within ~1.5km - use more controlled distribution
+        // This creates a more realistic pattern of cafes that follow main roads
+        const distance = Math.random() * 0.015 + 0.005; // Between 500m and 2km
+        const angle = Math.random() * Math.PI * 2; // Random angle in radians
+        
+        // Convert to cartesian coordinates - creates more natural distribution
+        const lat = centerLat + distance * Math.cos(angle);
+        const lng = centerLng + distance * Math.sin(angle);
+        
+        // Create cafe data
+        const cafeObj = {
+          id: `cafe-${i}`,
+          name: cafeNames[Math.floor(Math.random() * cafeNames.length)],
+          lat: lat,
+          lng: lng,
+          rating: Math.floor(Math.random() * 5) + 1,
+          wifi: Math.random() > 0.2 ? 'Available' : 'Limited',
+          power: Math.random() > 0.3 ? 'Yes' : 'Limited',
+          noise: ['Quiet', 'Moderate', 'Lively'][Math.floor(Math.random() * 3)],
+          hours: ['7AM-10PM', '8AM-9PM', '24/7', '6AM-11PM'][Math.floor(Math.random() * 4)]
+        };
+        
+        // Add to cafes array
+        allCafes.push(cafeObj);
+        
+        // Add marker with better styling and interaction
+        addCafeMarker(cafeObj);
       }
-    }
-
-    function renderReviews(){
-      const wrap=document.getElementById('cafeReviews'),
-            arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
-      wrap.innerHTML='';
-      if(arr.length===0){
-        wrap.innerHTML=`<div class="card" style="text-align:center;padding:2rem;">
-          <h3 style="color:var(--txt-2);">No reviews yet</h3>
-          <p>Share your experience at your favorite café!</p>
-        </div>`;
+      
+      // Remove loading indicator
+      const loadingElement = document.getElementById('map-loading');
+      if (loadingElement) loadingElement.remove();
+      
+      // Update the cafe list for the review form
+      updateCafeList();
+      
+      // Add marker clustering for better performance
+      if (allCafes.length > 8) {
+        setupMarkerClustering();
+      }
+    }, 300); // Short delay for better UI responsiveness
+  }
+  
+  // Add a single cafe marker with improved interactions
+  function addCafeMarker(cafe) {
+    // Create cafe marker with optimized icon
+    const marker = L.marker([cafe.lat, cafe.lng], {
+      title: cafe.name,
+      icon: L.divIcon({
+        html: `<div style="background-color:#8c67ff;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.3);font-size:14px;">☕</div>`,
+        className: '',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      }),
+      riseOnHover: true // Rise above other markers on hover
+    }).addTo(map);
+    
+    // Create optimized popup content with Google Maps link
+    const popupContent = `
+      <div style="width:220px;padding:6px 0;">
+        <h3 style="margin:0 0 4px;color:#8c67ff;font-size:16px;">${cafe.name}</h3>
+        <div style="color:#F8B400;margin:4px 0;">${'★'.repeat(cafe.rating)}${
+          '☆'.repeat(5-cafe.rating)}</div>
+        <p style="margin:4px 0;font-size:12px;">
+          ${cafe.hours} · WiFi: ${cafe.wifi} · Power: ${cafe.power}<br>
+          Noise level: ${cafe.noise}
+        </p>
+        <div style="display:flex;gap:5px;margin-top:8px;">
+          <a href="https://www.google.com/maps/search/?api=1&query=${
+            encodeURIComponent(cafe.name) + ' near ' + cafe.lat + ',' + cafe.lng}" 
+            target="_blank" class="cafe-btn" 
+            style="text-decoration:none;background:#4285F4;color:white;padding:5px 10px;border-radius:4px;font-size:12px;flex:1;text-align:center;">
+            Google Maps
+          </a>
+          <button onclick="selectCafeForReview('${
+            cafe.name.replace(/'/g, "\\'")}')" 
+            class="cafe-btn"
+            style="background:#8c67ff;color:white;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px;flex:1;">
+            Add Review
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Use lightweight popup options for better performance
+    const popupOptions = {
+      closeButton: false,
+      className: 'cafe-popup',
+      maxWidth: 220,
+      minWidth: 220,
+      offset: [0, -14]
+    };
+    
+    // Add popup with better performance options
+    marker.bindPopup(popupContent, popupOptions);
+    
+    // Add click handler for smooth interaction
+    marker.on('click', function() {
+      // Close any other open popups before opening this one
+      map.eachLayer(function(layer) {
+        if (layer.closePopup) {
+          layer.closePopup();
+        }
+      });
+      
+      // Open this popup
+      marker.openPopup();
+      
+      // Prevent map from being panned if the popup is clicked
+      const popup = marker.getPopup();
+      if (popup && popup._container) {
+        L.DomEvent.disableClickPropagation(popup._container);
+      }
+    });
+    
+    // Add marker to array
+    cafeMarkers.push(marker);
+    
+    return marker;
+  }
+  
+  // Add search control with better styling and functionality
+  function addSearchControl() {
+    // Create a custom control
+    const searchControl = L.Control.extend({
+      options: {
+        position: 'topleft'
+      },
+      
+      onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control cafe-search-control');
+        container.innerHTML = `
+          <input type="text" id="cafe-search-input" placeholder="Search cafes..." 
+                 style="width:180px;padding:6px 8px;border:none;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,0.2);font-size:14px;">
+        `;
+        
+        // Prevent map interactions when using the search
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.disableScrollPropagation(container);
+        
+        return container;
+      }
+    });
+    
+    // Add the control to the map
+    map.addControl(new searchControl());
+    
+    // Add event listener with debounce for better performance
+    let searchTimeout;
+    document.getElementById('cafe-search-input').addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const searchValue = this.value.toLowerCase();
+      
+      searchTimeout = setTimeout(() => {
+        // Update markers visibility
+        cafeMarkers.forEach((marker, index) => {
+          const cafe = allCafes[index];
+          if (!cafe) return;
+          
+          if (!searchValue || cafe.name.toLowerCase().includes(searchValue)) {
+            marker.setOpacity(1);
+          } else {
+            marker.setOpacity(0.3);
+          }
+        });
+        
+        // Filter dropdown list
+        updateCafeList(searchValue);
+      }, 100); // Small debounce delay
+    });
+  }
+  
+  // Set up marker clustering for better performance
+  function setupMarkerClustering() {
+    // Create a marker cluster group with performance options
+    const clusterOptions = {
+      chunkedLoading: true,
+      chunkInterval: 100, // Process markers in smaller chunks
+      chunkDelay: 10,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: false, // Disable spiderfy for better performance
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      singleMarkerMode: false,
+      disableClusteringAtZoom: 18,
+      iconCreateFunction: function(cluster) {
+        const count = cluster.getChildCount();
+        let size;
+        
+        // Scale size based on count for better visibility
+        if (count < 10) {
+          size = 36;
+        } else if (count < 30) {
+          size = 44;
+        } else {
+          size = 52;
+        }
+        
+        return L.divIcon({
+          html: `<div style="background:linear-gradient(135deg,#8c67ff,#4f46e5);color:white;width:${size}px;height:${size}px;
+                 border-radius:50%;display:flex;align-items:center;justify-content:center;
+                 box-shadow:0 2px 5px rgba(0,0,0,0.3);font-weight:bold;font-size:14px;">${count}</div>`,
+          className: '',
+          iconSize: [size, size],
+          iconAnchor: [size/2, size/2]
+        });
+      }
+    };
+    
+    // Create cluster group
+    const clusters = L.markerClusterGroup(clusterOptions);
+    
+    // Add all markers to the cluster group
+    cafeMarkers.forEach(marker => {
+      map.removeLayer(marker);
+      clusters.addLayer(marker);
+    });
+    
+    // Add the clusters to the map
+    map.addLayer(clusters);
+    markerCluster = clusters;
+  }
+  
+  // Update cafe list for dropdown
+  function updateCafeList(filter = '') {
+    // Clear existing options
+    cafeList.innerHTML = '';
+    
+    // Sort cafes alphabetically
+    const sortedCafes = [...allCafes].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Add filtered cafes to datalist
+    sortedCafes.forEach(cafe => {
+      if (!filter || cafe.name.toLowerCase().includes(filter.toLowerCase())) {
+        const option = document.createElement('option');
+        option.value = cafe.name;
+        cafeList.appendChild(option);
+      }
+    });
+  }
+  
+  // Set up review functionality
+  function setupReviewForm() {
+    // Handle form submission
+    reviewForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      // Get form values
+      const name = reviewName.value;
+      const rating = document.getElementById('reviewRating').value;
+      const category = document.getElementById('reviewCategory').value;
+      const text = document.getElementById('reviewText').value;
+      
+      // Validate
+      if (!name || !rating || !category || !text) {
+        alert('Please fill in all fields');
         return;
       }
-      arr.forEach((r,i)=>{
-        const c=document.createElement('div');
-        c.className='card';
-        c.style.position='relative';
-        c.innerHTML=`
-          <h4>${r.name}</h4>
-          <div style="color:var(--ac-warn);">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
-          <p>${r.text}</p>
-          <button data-index="${i}" class="delete-review btn btn-small btn-secondary">×</button>
-        `;
-        wrap.append(c);
+      
+      // Get existing reviews
+      const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+      
+      // Add new review
+      reviews.push({
+        name: name,
+        rating: parseInt(rating),
+        category: category,
+        text: text,
+        date: new Date().toISOString().split('T')[0]
       });
-      wrap.querySelectorAll('.delete-review').forEach(btn=>{
-        btn.onclick=()=>{
-          const arr=JSON.parse(localStorage.getItem('sb-reviews')||'[]');
-          arr.splice(+btn.dataset.index,1);
-          localStorage.setItem('sb-reviews',JSON.stringify(arr));
-          renderReviews();
-        };
-      });
+      
+      // Save to localStorage
+      localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+      
+      // Reset form
+      this.reset();
+      
+      // Show success message
+      const successMsg = document.createElement('div');
+      successMsg.style.cssText = 'background:#4CAF50;color:white;padding:10px;border-radius:4px;margin-top:10px;';
+      successMsg.textContent = 'Review added successfully!';
+      this.appendChild(successMsg);
+      
+      // Remove message after 3 seconds
+      setTimeout(() => successMsg.remove(), 3000);
+      
+      // Update reviews display
+      renderReviews();
+    });
+    
+    // Handle cafe selection in the form
+    reviewName.addEventListener('input', function() {
+      const selectedCafe = allCafes.find(c => c.name === this.value);
+      if (selectedCafe) {
+        // Pan to the cafe location
+        map.panTo([selectedCafe.lat, selectedCafe.lng]);
+        
+        // Find and open the marker popup
+        cafeMarkers.forEach((marker, index) => {
+          const cafe = allCafes[index];
+          if (cafe && cafe.name === selectedCafe.name) {
+            map.once('moveend', () => {
+              marker.openPopup();
+            });
+          }
+        });
+      }
+    });
+  }
+  
+  // Function to select a cafe for review (called from marker popup)
+  window.selectCafeForReview = function(cafeName) {
+    // Set the cafe name in the form
+    reviewName.value = cafeName;
+    
+    // Scroll to review form
+    reviewForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Focus on rating dropdown
+    setTimeout(() => {
+      document.getElementById('reviewRating').focus();
+    }, 500);
+  };
+  
+  // Render reviews with improved styling
+  function renderReviews() {
+    const reviewsContainer = document.getElementById('cafeReviews');
+    if (!reviewsContainer) return;
+    
+    // Get reviews from localStorage
+    const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+    
+    // Clear container
+    reviewsContainer.innerHTML = '';
+    
+    // Check if we have reviews
+    if (reviews.length === 0) {
+      reviewsContainer.innerHTML = `
+        <div class="card" style="text-align:center;padding:2rem;">
+          <h3 style="margin-bottom:1rem;color:var(--txt-2);">No Reviews Yet</h3>
+          <p>Share your experience at your favorite study spots!</p>
+        </div>
+      `;
+      return;
     }
+    
+    // Group reviews by cafe name
+    const reviewsByPlace = {};
+    reviews.forEach(review => {
+      if (!reviewsByPlace[review.name]) {
+        reviewsByPlace[review.name] = [];
+      }
+      reviewsByPlace[review.name].push(review);
+    });
+    
+    // Create a grid for reviews
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:1.5rem;';
+    reviewsContainer.appendChild(grid);
+    
+    // Add cards for each cafe
+    Object.keys(reviewsByPlace).sort().forEach(cafeName => {
+      const cafeReviews = reviewsByPlace[cafeName];
+      
+      // Calculate average rating
+      const avgRating = cafeReviews.reduce((sum, r) => sum + r.rating, 0) / cafeReviews.length;
+      
+      // Create card
+      const card = document.createElement('div');
+      card.className = 'card';
+      
+      // Card header
+      const header = document.createElement('div');
+      header.style.cssText = 'margin-bottom:0.8rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.8rem;';
+      
+      // Cafe name and rating
+      header.innerHTML = `
+        <h3 style="margin:0 0 0.5rem;font-size:1.2rem;">${cafeName}</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="color:var(--ac-warn);font-size:1.1rem;">
+            ${Array(Math.round(avgRating)).fill('★').join('')}${Array(5-Math.round(avgRating)).fill('☆').join('')}
+          </div>
+          <span style="color:var(--txt-2);font-size:0.8rem;">${cafeReviews.length} review${cafeReviews.length > 1 ? 's' : ''}</span>
+        </div>
+      `;
+      card.appendChild(header);
+      
+      // Reviews
+      const reviewsList = document.createElement('div');
+      reviewsList.style.cssText = 'max-height:300px;overflow-y:auto;padding-right:0.5rem;';
+      
+      // Add each review
+      cafeReviews.forEach((review, i) => {
+        const reviewItem = document.createElement('div');
+        reviewItem.style.cssText = `margin-bottom:${i < cafeReviews.length-1 ? '1rem' : '0'};padding-bottom:${i < cafeReviews.length-1 ? '1rem' : '0'};${i < cafeReviews.length-1 ? 'border-bottom:1px solid rgba(255,255,255,0.05);' : ''}`;
+        
+        reviewItem.innerHTML = `
+          <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+            <div style="color:var(--ac-warn);">${Array(review.rating).fill('★').join('')}${Array(5-review.rating).fill('☆').join('')}</div>
+            <div style="color:var(--txt-2);font-size:0.8rem;">${review.date || 'No date'}</div>
+          </div>
+          <p style="margin:0;font-size:0.9rem;">${review.text}</p>
+          ${review.category ? `<span style="display:inline-block;background:rgba(140,103,255,0.2);color:var(--txt-1);font-size:0.7rem;padding:2px 6px;border-radius:3px;margin-top:0.5rem;">Best for: ${review.category}</span>` : ''}
+          <button data-cafe="${cafeName}" data-index="${i}" class="btn btn-small btn-secondary delete-review" style="position:absolute;top:10px;right:10px;padding:2px 6px;font-size:0.8rem;">×</button>
+        `;
+        
+        reviewsList.appendChild(reviewItem);
+      });
+      
+      card.appendChild(reviewsList);
+      grid.appendChild(card);
+    });
+    
+    // Add event listeners to delete buttons
+    reviewsContainer.querySelectorAll('.delete-review').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const cafeName = this.dataset.cafe;
+        const reviewIndex = parseInt(this.dataset.index);
+        
+        // Find all reviews for this cafe
+        const reviews = JSON.parse(localStorage.getItem('sb-reviews') || '[]');
+        const cafeReviews = reviews.filter(r => r.name === cafeName);
+        
+        if (reviewIndex >= 0 && reviewIndex < cafeReviews.length) {
+          // Find the global index
+          const reviewToDelete = cafeReviews[reviewIndex];
+          const globalIndex = reviews.findIndex(r => 
+            r.name === reviewToDelete.name && 
+            r.text === reviewToDelete.text && 
+            r.date === reviewToDelete.date
+          );
+          
+          if (globalIndex !== -1) {
+            // Remove from array
+            reviews.splice(globalIndex, 1);
+            
+            // Save to localStorage
+            localStorage.setItem('sb-reviews', JSON.stringify(reviews));
+            
+            // Re-render
+            renderReviews();
+          }
+        }
+      });
+    });
+  }
+  
+  // Initialize components
+  initializeMap();
+  setupReviewForm();
+  renderReviews();
+  
+  // Add resize listener for better map performance
+  let resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (map) map.invalidateSize();
+    }, 200);
+  });
+}
+
+// Add this function to make "selectCafeForReview" globally available
+window.selectCafeForReview = function(cafeName) {
+  const reviewName = document.getElementById('reviewName');
+  const reviewForm = document.getElementById('reviewForm');
+  
+  if (reviewName && reviewForm) {
+    reviewName.value = cafeName;
+    reviewForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      document.getElementById('reviewRating').focus();
+    }, 500);
+  }
+};
 
     // GAMES
     function initGames(){
-      const sel=document.getElementById('gameSelect'),
-            games=[
-              ['Wordle Clone','https://wordlegame.org/'],
-              ['Hangman','https://hangmanwordgame.com/'],
-              ['Flappy Bird','https://flappybird.io/'],
-              ['Minesweeper','https://kamoroso94.github.io/minesweeper/'],
-              ['Sudoku','https://sudoku.com/'],
-              ['Connect Four','https://torikul007.github.io/Connect_Four/']
-            ];
+      const sel=document.getElementById('gameSelect');
+      const games=[
+      ['Wordle Clone', 'https://wordlegame.org/'],
+    ['Hangman',      'https://hangmanwordgame.com/'],
+      ['Flappy Bird',         'https://flappybird.io/'],
+      ['Minesweeper',         'https://kamoroso94.github.io/minesweeper/'],      // :contentReference[oaicite:0]{index=0}
+      ['Sudoku',           'https://sudoku.com/'],
+      ['Connect Four',        'https://torikul007.github.io/Connect_Four/']       // :contentReference[oaicite:1]{index=1}
+      ];
       games.forEach(g=>{
         const o=document.createElement('option');
         o.value=g[1]; o.textContent=g[0];
@@ -671,22 +1501,18 @@
 
     // SESSIONS
     function initSessions(){
-      const getS=()=>JSON.parse(localStorage.getItem('sb-sessions')||'[]'),
-            saveS=a=>localStorage.setItem('sb-sessions',JSON.stringify(a));
+      const getS=()=>JSON.parse(localStorage.getItem('sb-sessions')||'[]');
+      const saveS=a=>localStorage.setItem('sb-sessions',JSON.stringify(a));
       const renderS=()=>{
-        const ul=document.getElementById('sessionList'), a=getS();
+        const ul=document.getElementById('sessionList'),a=getS();
         ul.innerHTML='';
-        if(!a.length){ ul.innerHTML='<li class="card">No sessions.</li>'; return; }
+        if(!a.length){ul.innerHTML='<li class="card">No sessions.</li>';return;}
         a.forEach((s,i)=>{
-          const li=document.createElement('li');
-          li.className='card';
-          li.style.marginBottom='.6rem';
-          li.innerHTML=`
-            <strong>${s.topic}</strong> ${s.date} — ${s.duration} min
+          const li=document.createElement('li');li.className='card';li.style.marginBottom='.6rem';
+          li.innerHTML=`<strong>${s.topic}</strong> ${s.date} — ${s.duration} min
             <button class="btn btn-small btn-secondary" onclick="(()=>{
-              const arr=getS(); arr.splice(${i},1); saveS(arr); renderS();
-            })()">Delete</button>
-          `;
+              const arr=getS();arr.splice(${i},1);saveS(arr);renderS();
+            })()">Delete</button>`;
           ul.append(li);
         });
       };
@@ -696,35 +1522,30 @@
         arr.push({
           topic:document.getElementById('sessionTopic').value,
           date:document.getElementById('sessionDate').value,
-         	duration:+document.getElementById('sessionDuration').value
+          duration:+document.getElementById('sessionDuration').value
         });
-        saveS(arr); renderS(); e.target.reset();
+        saveS(arr);renderS();e.target.reset();
       });
       renderS();
     }
 
     // PLANNER
     function initPlanner(){
-      const getP=()=>JSON.parse(localStorage.getItem('sb-plans')||'[]'),
-            saveP=a=>localStorage.setItem('sb-plans',JSON.stringify(a));
+      const getP=()=>JSON.parse(localStorage.getItem('sb-plans')||'[]');
+      const saveP=a=>localStorage.setItem('sb-plans',JSON.stringify(a));
       const renderP=()=>{
-        const wrap=document.getElementById('planList'), a=getP();
+        const wrap=document.getElementById('planList'),a=getP();
         wrap.innerHTML='';
         a.forEach((p,i)=>{
-          const c=document.createElement('div');
-          c.className='card';
-          c.innerHTML=`
-            <h4>${p.title}</h4>
-            <small>${p.category} — ${p.date}</small>
-            <p>${p.desc}</p>
-            <button class="btn btn-small btn-secondary delete-plan" data-index="${i}">×</button>
-          `;
+          const c=document.createElement('div');c.className='card';
+          c.innerHTML=`<h4>${p.title}</h4><small>${p.category} — ${p.date}</small><p>${p.desc}</p>
+                       <button class="btn btn-small btn-secondary delete-plan" data-index="${i}">×</button>`;
           wrap.append(c);
         });
         wrap.querySelectorAll('.delete-plan').forEach(btn=>{
           btn.onclick=()=>{
-            const arr=getP(); arr.splice(+btn.dataset.index,1);
-            saveP(arr); renderP();
+            const arr=getP();arr.splice(+btn.dataset.index,1);
+            saveP(arr);renderP();
           };
         });
       };
@@ -737,7 +1558,7 @@
           desc:document.getElementById('planDesc').value,
           date:document.getElementById('planDate').value
         });
-        saveP(arr); renderP(); e.target.reset();
+        saveP(arr);renderP();e.target.reset();
       });
       document.getElementById('planStudy').onclick=async()=>{
         const tasks=getP();
@@ -748,11 +1569,7 @@
         document.getElementById('plannerAdvice').textContent="Generating study plan…";
         const msg=`I have these tasks:\n${tasks.map(t=>`- ${t.title} (${t.category}), due ${t.date}: ${t.desc}`).join('\n')}\n\nPlease give me a day-by-day schedule.`;
         try{
-          const res=await fetch('/api/chat',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({message:msg})
-          });
+          const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
           const d=await res.json();
           let out=d.reply||'No advice.';
           out=out.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):/g,m=>`\n\n📅 ${m}`);
@@ -774,16 +1591,12 @@
       cl.onclick=()=>w.classList.remove('open');
       document.getElementById('chatInput').addEventListener('submit',async e=>{
         e.preventDefault();
-        const inp=e.target.querySelector('input'), txt=inp.value.trim();
+        const inp=e.target.querySelector('input'),txt=inp.value.trim();
         if(!txt) return;
         addChat('me',txt); inp.value='';
         addChat('bot','...');
         try{
-          const res=await fetch('/api/chat',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({message:txt})
-          });
+          const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:txt})});
           const d=await res.json();
           const ps=document.querySelectorAll('#chatBody .bot p');
           ps[ps.length-1].textContent=d.reply||"Couldn't process.";
@@ -794,12 +1607,8 @@
       });
     }
     function addChat(who,txt){
-      const b=document.getElementById('chatBody'),
-            d=document.createElement('div');
-      d.className='row '+who;
-      d.innerHTML=`<p>${txt}</p>`;
-      b.append(d);
-      b.scrollTop=b.scrollHeight;
+      const b=document.getElementById('chatBody'),d=document.createElement('div');
+      d.className='row '+who; d.innerHTML=`<p>${txt}</p>`; b.append(d); b.scrollTop=b.scrollHeight;
     }
   </script>
 </body>
